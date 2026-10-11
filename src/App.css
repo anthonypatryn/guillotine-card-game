@@ -21,6 +21,15 @@
 }
 .tagline { color: var(--muted); font-style: italic; font-size: 13px; }
 
+.music-player { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.mp-btn {
+  background: var(--panel-light); border: 1px solid var(--panel-light); color: var(--ink);
+  border-radius: 5px; cursor: pointer; font-size: 13px; padding: 3px 9px; line-height: 1;
+}
+.mp-btn:hover { filter: brightness(1.2); }
+.mp-name { color: var(--muted); font-size: 12px; font-style: italic; min-width: 96px; }
+.mp-vol { width: 80px; accent-color: var(--accent); }
+
 /* ─── Screens ─── */
 .screen.center {
   flex: 1;
@@ -88,6 +97,11 @@
 }
 .hud .message { flex: 1; color: var(--ink); }
 .hud .deck-counts { color: var(--muted); font-size: 13px; }
+.sound-toggle {
+  background: var(--panel-light); border: 1px solid var(--panel-light); border-radius: 6px;
+  cursor: pointer; font-size: 16px; line-height: 1; padding: 5px 9px;
+}
+.sound-toggle:hover { filter: brightness(1.2); }
 
 /* ─── Line + guillotine ─── */
 .line-area {
@@ -321,9 +335,8 @@
   box-shadow: 0 0 12px #fff, 0 0 4px #fff;
 }
 
-.blood-wrap { position: fixed; width: 340px; height: 340px; pointer-events: none; }
-.blood { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
-.blood circle { fill: #7d0b0b; }
+.blood-wrap { position: fixed; width: 360px; height: 360px; pointer-events: none; }
+.blood-img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }
 
 /* collected noble shown as two jaunty halves — one logical card */
 .sliced-thumb {

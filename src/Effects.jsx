@@ -77,38 +77,29 @@ export function SliceFlier({ flier, onDone }) {
   );
 }
 
-// A burst of blood on the "camera" — varied each time.
+// A burst of blood on the "camera" — a real splatter PNG, varied each time.
+const BLOOD = ['/blood/b1.png', '/blood/b2.png', '/blood/b3.png', '/blood/b4.png', '/blood/b5.png'];
+
 export function BloodSplatter({ splat, onDone }) {
   const ref = useRef(null);
-  const blobs = useMemo(() => {
-    const s = splat.key, arr = [];
-    const main = 4 + Math.floor(rng(s) * 4);
-    for (let i = 0; i < main; i++)
-      arr.push({ cx: 60 + (rng(s + i) * 2 - 1) * 55, cy: 60 + (rng(s + i * 3) * 2 - 1) * 55, r: 8 + rng(s + i * 7) * 24 });
-    const drops = 12 + Math.floor(rng(s + 99) * 16);
-    for (let i = 0; i < drops; i++)
-      arr.push({ cx: 60 + (rng(s + i * 11) * 2 - 1) * 110, cy: 60 + (rng(s + i * 13) * 2 - 1) * 110, r: 1 + rng(s + i * 17) * 4.5 });
-    return arr;
-  }, [splat.key]);
+  const src = useMemo(() => BLOOD[Math.floor(rng(splat.key) * BLOOD.length)], [splat.key]);
 
   useLayoutEffect(() => {
     if (REDUCE) { onDone(); return; }
     const a = ref.current.animate([
-      { opacity: 0, transform: 'scale(.7)' },
-      { opacity: .9, transform: 'scale(1.05)', offset: .12 },
-      { opacity: .8, transform: 'scale(1)', offset: .45 },
-      { opacity: 0, transform: 'scale(1)' },
-    ], { duration: 820, easing: 'ease-out', fill: 'forwards' });
+      { opacity: 0, transform: 'scale(.55)' },
+      { opacity: .95, transform: 'scale(1.07)', offset: .1 },
+      { opacity: .88, transform: 'scale(1)', offset: .5 },
+      { opacity: 0, transform: 'scale(1.03)' },
+    ], { duration: 900, easing: 'ease-out', fill: 'forwards' });
     a.onfinish = onDone;
     return () => a.cancel();
   }, []);
 
-  const rot = (rng(splat.key + 1) * 2 - 1) * 45;
+  const rot = (rng(splat.key + 1) * 2 - 1) * 180;
   return (
     <div className="blood-wrap" style={{ left: splat.x, top: splat.y, transform: `translate(-50%,-50%) rotate(${rot}deg) scale(${splat.scale})` }}>
-      <svg ref={ref} className="blood" viewBox="0 0 120 120">
-        {blobs.map((b, i) => <circle key={i} cx={b.cx} cy={b.cy} r={b.r} />)}
-      </svg>
+      <img ref={ref} className="blood-img" src={src} alt="" />
     </div>
   );
 }

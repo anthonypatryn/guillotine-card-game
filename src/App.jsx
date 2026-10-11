@@ -8,6 +8,7 @@ import {
 import { computeScore } from './utils/scoring';
 import { judgeBlocks, callousActive } from './utils/effects';
 import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner } from './Effects';
+import { playBehead, isMuted, toggleMuted } from './sound';
 
 export default function App() {
   const game = useGame();
@@ -34,6 +35,7 @@ export default function App() {
       <header className="topbar">
         <h1>Guillotine</h1>
         <span className="tagline">win by getting a head</span>
+        <MusicPlayer />
       </header>
       {G.phase === 'start' && <StartScreen onStart={game.start} />}
       {G.phase === 'gameOver' && <GameOver G={G} onRestart={game.restart} />}
@@ -138,6 +140,7 @@ function Board({ game }) {
     const newFliers = [], newSplats = [];
     for (const e of fresh) {
       if (e.kind !== 'collect') continue;
+      playBehead();
       const from = lineRects.current[String(e.uid)];
       const pile = document.querySelector(`[data-pile="${e.playerIdx}"]`);
       if (!from || !pile) continue;
@@ -175,6 +178,7 @@ function Board({ game }) {
           <span className="day-chip">Day {G.day} / 3</span>
           <span className="message">{G.message}</span>
           <span className="deck-counts">Nobles {G.nobleDeck.length} · Actions {G.actionDeck.length}</span>
+          <SoundToggle />
         </div>
 
         {locks.length > 0 && (
@@ -411,6 +415,67 @@ function InspectorPane({ inspect }) {
         <div className="inspect-hint">Hover a card to inspect it.</div>
       )}
     </div>
+  );
+}
+
+const TRACKS = [
+  { src: '/music/01-french-jazz.mp3', name: 'French Jazz' },
+  { src: '/music/02-paris.mp3', name: 'Paris' },
+  { src: '/music/03-france-paris.mp3', name: 'France · Paris' },
+  { src: '/music/04-french-france.mp3', name: 'Rue de Paris' },
+  { src: '/music/05-montmartre.mp3', name: 'Montmartre' },
+  { src: '/music/06-cafe-de-paris.mp3', name: 'Café de Paris' },
+];
+
+function MusicPlayer() {
+  const audioRef = useRef(null);
+  const [idx, setIdx] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [vol, setVol] = useState(() => {
+    try { return parseFloat(localStorage.getItem('guillotine-music-vol') ?? '0.4'); } catch { return 0.4; }
+  });
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = vol;
+    try { localStorage.setItem('guillotine-music-vol', String(vol)); } catch { /* ignore */ }
+  }, [vol]);
+
+  // Load (and continue playing) when the track changes.
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    a.src = TRACKS[idx].src;
+    a.volume = vol;
+    if (playing) a.play().catch(() => {});
+  }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggle = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (playing) { a.pause(); setPlaying(false); }
+    else { a.play().then(() => setPlaying(true)).catch(() => {}); }
+  };
+  const next = () => setIdx(i => (i + 1) % TRACKS.length);
+
+  return (
+    <div className="music-player">
+      <audio ref={audioRef} onEnded={next} />
+      <button className="mp-btn" onClick={toggle} title={playing ? 'Pause' : 'Play'}>{playing ? '⏸' : '▶'}</button>
+      <button className="mp-btn" onClick={next} title="Next track">⏭</button>
+      <span className="mp-name">♪ {TRACKS[idx].name}</span>
+      <input className="mp-vol" type="range" min="0" max="1" step="0.05" value={vol}
+        onChange={e => setVol(parseFloat(e.target.value))} title="Music volume" />
+    </div>
+  );
+}
+
+function SoundToggle() {
+  const [muted, setMuted] = useState(isMuted());
+  return (
+    <button className="sound-toggle" title={muted ? 'Unmute' : 'Mute'}
+      onClick={() => setMuted(toggleMuted())}>
+      {muted ? '🔇' : '🔊'}
+    </button>
   );
 }
 
