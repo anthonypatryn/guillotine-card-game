@@ -557,3 +557,22 @@
   background-repeat: repeat, repeat;
 }
 .field { background: rgba(16, 11, 8, 0.4); }
+
+/* bigger cobbles */
+.board2 { background-size: auto, 620px; }
+
+/* theme sheet */
+.theme-sheet { max-width: min(92vw, 470px); align-items: stretch; }
+.ts-label { font-family: var(--font-head); font-weight: 700; margin: 8px 0 2px; color: var(--muted); font-size: 13px; letter-spacing: .5px; }
+.ts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ts-pal, .ts-font {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  background: var(--panel); border: 2px solid var(--panel-light); border-radius: 8px; color: var(--ink); cursor: pointer;
+}
+.ts-pal.on, .ts-font.on { border-color: var(--gold); box-shadow: 0 0 8px rgba(201,162,39,.4); }
+.ts-pal:hover, .ts-font:hover { filter: brightness(1.12); }
+.ts-sw { display: inline-flex; border-radius: 4px; overflow: hidden; border: 1px solid rgba(0,0,0,.4); flex: 0 0 auto; }
+.ts-sw i { width: 13px; height: 24px; display: block; }
+.ts-name { font-family: var(--font-head); font-size: 13px; }
+.ts-font { justify-content: center; font-size: 19px; }
+.theme-btn { font-size: 15px; }

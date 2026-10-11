@@ -10,9 +10,53 @@ import { judgeBlocks, callousActive } from './utils/effects';
 import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner } from './Effects';
 import { playBehead, isMuted, toggleMuted } from './sound';
 
+// ─── Themes: color palettes + font sets (chosen in the Theme sheet) ─────────
+const PALETTES = {
+  'parisian-noir': { name: 'Parisian Noir', swatch: ['#171210', '#7e1d26', '#c8a24a', '#efe3cd'], vars: {
+    '--bg': '#171210', '--panel': '#241a14', '--panel-light': '#3b2d22', '--ink': '#f1e7d4', '--muted': '#b7a586',
+    '--accent': '#7e1d26', '--accent-bright': '#b4323d', '--gold': '#c8a24a', '--cream': '#efe3cd' } },
+  'french-quarter': { name: 'French Quarter', swatch: ['#241d16', '#8a4a3c', '#d6a23c', '#c7c3b6'], vars: {
+    '--bg': '#241d16', '--panel': '#352a20', '--panel-light': '#4a3b2c', '--ink': '#efe6d4', '--muted': '#bcae92',
+    '--accent': '#8a4a3c', '--accent-bright': '#a85a48', '--gold': '#d6a23c', '--cream': '#c7c3b6' } },
+  'belle-epoque': { name: 'Belle Époque', swatch: ['#13202b', '#d48d91', '#e6c08a', '#9fb0bf'], vars: {
+    '--bg': '#13202b', '--panel': '#1c2f40', '--panel-light': '#2b4559', '--ink': '#f2e5d4', '--muted': '#9fb0bf',
+    '--accent': '#b0545a', '--accent-bright': '#d48d91', '--gold': '#e6c08a', '--cream': '#f2ceae' } },
+  'bordeaux': { name: 'Bordeaux & Gold', swatch: ['#1a1010', '#6e1423', '#caa64a', '#e8dcc6'], vars: {
+    '--bg': '#1a1010', '--panel': '#281619', '--panel-light': '#3c2329', '--ink': '#f0e3d6', '--muted': '#b09a8e',
+    '--accent': '#6e1423', '--accent-bright': '#a01e30', '--gold': '#caa64a', '--cream': '#e8dcc6' } },
+};
+const FONTSETS = {
+  pirata:   { name: 'Guillotine', display: "'Pirata One', serif",        head: "'Playfair Display', serif", body: "'EB Garamond', serif" },
+  playfair: { name: 'Salon',      display: "'Playfair Display', serif",  head: "'Playfair Display', serif", body: "'EB Garamond', serif" },
+  cinzel:   { name: 'Classical',  display: "'Cinzel Decorative', serif", head: "'Cinzel', serif",           body: "'Cormorant Garamond', serif" },
+  modern:   { name: 'Modern',     display: "'Oswald', sans-serif",       head: "'Oswald', sans-serif",      body: "'Work Sans', sans-serif" },
+};
+const THEME_KEY = 'guillotine-theme';
+function loadTheme() {
+  try { const t = JSON.parse(localStorage.getItem(THEME_KEY)); if (t && t.palette && t.font) return t; } catch { /* ignore */ }
+  return { palette: 'parisian-noir', font: 'pirata' };
+}
+function applyTheme({ palette, font }) {
+  const root = document.documentElement;
+  const p = PALETTES[palette]; if (p) Object.entries(p.vars).forEach(([k, v]) => root.style.setProperty(k, v));
+  const f = FONTSETS[font]; if (f) {
+    root.style.setProperty('--font-display', f.display);
+    root.style.setProperty('--font-head', f.head);
+    root.style.setProperty('--font-body', f.body);
+  }
+}
+applyTheme(loadTheme());
+
 export default function App() {
   const game = useGame();
   const { G } = game;
+  const [theme, setThemeState] = useState(loadTheme);
+  const [showTheme, setShowTheme] = useState(false);
+  const setTheme = (patch) => {
+    const nt = { ...theme, ...patch };
+    setThemeState(nt); applyTheme(nt);
+    try { localStorage.setItem(THEME_KEY, JSON.stringify(nt)); } catch { /* ignore */ }
+  };
 
   // No handoff screen for now — advance straight into the next turn.
   useEffect(() => {
@@ -34,8 +78,10 @@ export default function App() {
       <header className="topbar">
         <h1>Guillotine</h1>
         <span className="tagline">win by getting a head</span>
+        <button className="nav-btn theme-btn" onClick={() => setShowTheme(true)} title="Theme &amp; fonts">🎨</button>
         <MusicPlayer />
       </header>
+      {showTheme && <ThemeSheet theme={theme} setTheme={setTheme} close={() => setShowTheme(false)} />}
       {G.phase === 'start' && <StartScreen onStart={game.start} />}
       {G.phase === 'gameOver' && <GameOver G={G} onRestart={game.restart} />}
       {(G.phase === 'playing' || G.phase === 'targeting' || G.phase === 'pass') && <Board game={game} />}
@@ -560,6 +606,35 @@ function LogPanel({ log }) {
         {recent.map((entry, i) => (
           <div key={entry.id} className={'log-line' + (i === 0 ? ' newest' : '')}>{entry.text}</div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function ThemeSheet({ theme, setTheme, close }) {
+  return (
+    <div className="modal-backdrop" onClick={close}>
+      <div className="modal theme-sheet" onClick={e => e.stopPropagation()}>
+        <p className="modal-title">Theme &amp; Fonts</p>
+        <div className="ts-label">Color palette</div>
+        <div className="ts-grid">
+          {Object.entries(PALETTES).map(([k, p]) => (
+            <button key={k} className={'ts-pal' + (theme.palette === k ? ' on' : '')} onClick={() => setTheme({ palette: k })}>
+              <span className="ts-sw">{p.swatch.map((c, i) => <i key={i} style={{ background: c }} />)}</span>
+              <span className="ts-name">{p.name}</span>
+            </button>
+          ))}
+        </div>
+        <div className="ts-label">Fonts</div>
+        <div className="ts-grid">
+          {Object.entries(FONTSETS).map(([k, f]) => (
+            <button key={k} className={'ts-font' + (theme.font === k ? ' on' : '')}
+              onClick={() => setTheme({ font: k })} style={{ fontFamily: f.display }}>
+              {f.name}
+            </button>
+          ))}
+        </div>
+        <button className="btn primary" onClick={close}>Done</button>
       </div>
     </div>
   );
