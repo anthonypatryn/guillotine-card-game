@@ -1,0 +1,29 @@
+* { box-sizing: border-box; }
+
+:root {
+  --bg: #1b1410;
+  --panel: #2a201a;
+  --panel-light: #3a2d24;
+  --ink: #f3e9da;
+  --muted: #b8a890;
+  --accent: #b03a2e;
+  --accent-bright: #e74c3c;
+  --gold: #c9a227;
+
+  --blue: #4a90c2;
+  --green: #6aa84f;
+  --gray: #8a8a8a;
+  --red: #c0392b;
+  --purple: #8e5fb0;
+}
+
+html, body, #root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+}
