@@ -37,29 +37,37 @@ const PALETTES = {
     '--bg': '#efe7d8', '--panel': '#e2d6c1', '--panel-light': '#d0c0a2', '--ink': '#3b342a', '--muted': '#7a6e5b',
     '--accent': '#b06a4a', '--accent-bright': '#c47a55', '--gold': '#d8a23c', '--cream': '#f4ecdd' } },
 };
-const FONTSETS = {
-  vintage: { name: 'Vintage Label',  display: "'Rye', serif",             head: "'Marcellus', serif",       body: "'EB Garamond', serif" },
-  fashion: { name: 'Parisienne Mode', display: "'Abril Fatface', serif",  head: "'Playfair Display', serif", body: "'Cormorant Garamond', serif" },
-  deco:    { name: 'Belle Déco',     display: "'Poiret One', sans-serif", head: "'Poiret One', sans-serif",  body: "'Jost', sans-serif" },
-  script:  { name: 'Rue Script',     display: "'Parisienne', cursive",    head: "'Marcellus', serif",        body: "'Cormorant Garamond', serif" },
-  titling: { name: 'Grand Titling',  display: "'Yeseva One', serif",      head: "'Marcellus SC', serif",     body: "'EB Garamond', serif" },
+// Headings & body are chosen independently so you can dial in the exact look.
+const HEAD_FONTS = {
+  fraunces:  { name: 'Fraunces',    css: "'Fraunces', Georgia, serif" },
+  playfair:  { name: 'Playfair',    css: "'Playfair Display', Georgia, serif" },
+  bodoni:    { name: 'Bodoni',      css: "'Bodoni Moda', Georgia, serif" },
+  cormorant: { name: 'Cormorant',   css: "'Cormorant Garamond', Georgia, serif" },
+  marcellus: { name: 'Marcellus',   css: "'Marcellus', Georgia, serif" },
+  cinzel:    { name: 'Cinzel',      css: "'Cinzel', Georgia, serif" },
+  abril:     { name: 'Abril',       css: "'Abril Fatface', Georgia, serif" },
+  yeseva:    { name: 'Yeseva',      css: "'Yeseva One', Georgia, serif" },
+  rye:       { name: 'Rye',         css: "'Rye', serif" },
+};
+const BODY_FONTS = {
+  shantell:  { name: 'Shantell (handmade)', css: "'Shantell Sans', system-ui, sans-serif" },
+  jost:      { name: 'Jost',                css: "'Jost', system-ui, sans-serif" },
+  garamond:  { name: 'EB Garamond',         css: "'EB Garamond', Georgia, serif" },
+  cormorant: { name: 'Cormorant',           css: "'Cormorant Garamond', Georgia, serif" },
 };
 const THEME_KEY = 'guillotine-theme';
 function loadTheme() {
   try {
     const t = JSON.parse(localStorage.getItem(THEME_KEY));
-    if (t && PALETTES[t.palette] && FONTSETS[t.font]) return t;
+    if (t && PALETTES[t.palette] && HEAD_FONTS[t.head] && BODY_FONTS[t.body]) return t;
   } catch { /* ignore */ }
-  return { palette: 'parisian-noir', font: 'vintage' };
+  return { palette: 'parisian-noir', head: 'fraunces', body: 'shantell' };
 }
-function applyTheme({ palette, font }) {
+function applyTheme({ palette, head, body }) {
   const root = document.documentElement;
   const p = PALETTES[palette]; if (p) Object.entries(p.vars).forEach(([k, v]) => root.style.setProperty(k, v));
-  const f = FONTSETS[font]; if (f) {
-    root.style.setProperty('--font-display', f.display);
-    root.style.setProperty('--font-head', f.head);
-    root.style.setProperty('--font-body', f.body);
-  }
+  const h = HEAD_FONTS[head]; if (h) { root.style.setProperty('--font-head', h.css); root.style.setProperty('--font-display', h.css); }
+  const b = BODY_FONTS[body]; if (b) root.style.setProperty('--font-body', b.css);
 }
 applyTheme(loadTheme());
 
@@ -718,11 +726,20 @@ function ThemeSheet({ theme, setTheme, close }) {
             </button>
           ))}
         </div>
-        <div className="ts-label">Fonts</div>
+        <div className="ts-label">Headings</div>
+        <div className="ts-grid ts-grid-3">
+          {Object.entries(HEAD_FONTS).map(([k, f]) => (
+            <button key={k} className={'ts-font' + (theme.head === k ? ' on' : '')}
+              onClick={() => setTheme({ head: k })} style={{ fontFamily: f.css }}>
+              {f.name}
+            </button>
+          ))}
+        </div>
+        <div className="ts-label">Body text</div>
         <div className="ts-grid">
-          {Object.entries(FONTSETS).map(([k, f]) => (
-            <button key={k} className={'ts-font' + (theme.font === k ? ' on' : '')}
-              onClick={() => setTheme({ font: k })} style={{ fontFamily: f.display }}>
+          {Object.entries(BODY_FONTS).map(([k, f]) => (
+            <button key={k} className={'ts-font' + (theme.body === k ? ' on' : '')}
+              onClick={() => setTheme({ body: k })} style={{ fontFamily: f.css }}>
               {f.name}
             </button>
           ))}
