@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Pirata+One&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&family=EB+Garamond:wght@400;500;600;700&family=Cinzel:wght@500;700&family=Cinzel+Decorative:wght@700&family=Cormorant+Garamond:wght@500;600;700&family=Oswald:wght@400;600&family=Work+Sans:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Rye&family=Abril+Fatface&family=Poiret+One&family=Parisienne&family=Marcellus&family=Marcellus+SC&family=Yeseva+One&family=Cormorant+Garamond:wght@500;600;700&family=Jost:wght@400;500;600&family=EB+Garamond:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800&display=swap');
 
 * { box-sizing: border-box; }
 
@@ -22,8 +22,8 @@
   --red: #c0392b;
   --purple: #8e5fb0;
 
-  --font-display: 'Pirata One', 'Playfair Display', serif;
-  --font-head: 'Playfair Display', Georgia, serif;
+  --font-display: 'Rye', 'Marcellus', serif;
+  --font-head: 'Marcellus', Georgia, serif;
   --font-body: 'EB Garamond', Georgia, serif;
 }
 

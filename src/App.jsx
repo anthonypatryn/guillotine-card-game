@@ -24,17 +24,33 @@ const PALETTES = {
   'bordeaux': { name: 'Bordeaux & Gold', swatch: ['#1a1010', '#6e1423', '#caa64a', '#e8dcc6'], vars: {
     '--bg': '#1a1010', '--panel': '#281619', '--panel-light': '#3c2329', '--ink': '#f0e3d6', '--muted': '#b09a8e',
     '--accent': '#6e1423', '--accent-bright': '#a01e30', '--gold': '#caa64a', '--cream': '#e8dcc6' } },
+  'provence': { name: 'Provence (Lavender)', swatch: ['#2a2533', '#8e7bb0', '#d6a23c', '#abb2a6'], vars: {
+    '--bg': '#2a2533', '--panel': '#352e40', '--panel-light': '#473c54', '--ink': '#efe6d4', '--muted': '#b3a7bf',
+    '--accent': '#6a5a8a', '--accent-bright': '#8e7bb0', '--gold': '#d6a23c', '--cream': '#e9dcc6' } },
+  'cote-dazur': { name: "Côte d'Azur", swatch: ['#0f2a3a', '#2e9cb0', '#e8c35a', '#f2ead6'], vars: {
+    '--bg': '#0f2a3a', '--panel': '#163a4c', '--panel-light': '#215067', '--ink': '#f0ead8', '--muted': '#9fc0d0',
+    '--accent': '#1f7a8c', '--accent-bright': '#2e9cb0', '--gold': '#e8c35a', '--cream': '#f2ead6' } },
+  'provincial': { name: 'French Provincial', light: true, swatch: ['#4e5760', '#abb2a6', '#e0d3c4', '#eee9e2'], vars: {
+    '--bg': '#e9e3d7', '--panel': '#dcd2c1', '--panel-light': '#cabda4', '--ink': '#3a362f', '--muted': '#6e6557',
+    '--accent': '#4e5760', '--accent-bright': '#63707b', '--gold': '#b5a492', '--cream': '#eee9e2' } },
+  'farmhouse': { name: 'French Farmhouse', light: true, swatch: ['#efe7d8', '#b06a4a', '#8fa58c', '#7fa0bd'], vars: {
+    '--bg': '#efe7d8', '--panel': '#e2d6c1', '--panel-light': '#d0c0a2', '--ink': '#3b342a', '--muted': '#7a6e5b',
+    '--accent': '#b06a4a', '--accent-bright': '#c47a55', '--gold': '#d8a23c', '--cream': '#f4ecdd' } },
 };
 const FONTSETS = {
-  pirata:   { name: 'Guillotine', display: "'Pirata One', serif",        head: "'Playfair Display', serif", body: "'EB Garamond', serif" },
-  playfair: { name: 'Salon',      display: "'Playfair Display', serif",  head: "'Playfair Display', serif", body: "'EB Garamond', serif" },
-  cinzel:   { name: 'Classical',  display: "'Cinzel Decorative', serif", head: "'Cinzel', serif",           body: "'Cormorant Garamond', serif" },
-  modern:   { name: 'Modern',     display: "'Oswald', sans-serif",       head: "'Oswald', sans-serif",      body: "'Work Sans', sans-serif" },
+  vintage: { name: 'Vintage Label',  display: "'Rye', serif",             head: "'Marcellus', serif",       body: "'EB Garamond', serif" },
+  fashion: { name: 'Parisienne Mode', display: "'Abril Fatface', serif",  head: "'Playfair Display', serif", body: "'Cormorant Garamond', serif" },
+  deco:    { name: 'Belle Déco',     display: "'Poiret One', sans-serif", head: "'Poiret One', sans-serif",  body: "'Jost', sans-serif" },
+  script:  { name: 'Rue Script',     display: "'Parisienne', cursive",    head: "'Marcellus', serif",        body: "'Cormorant Garamond', serif" },
+  titling: { name: 'Grand Titling',  display: "'Yeseva One', serif",      head: "'Marcellus SC', serif",     body: "'EB Garamond', serif" },
 };
 const THEME_KEY = 'guillotine-theme';
 function loadTheme() {
-  try { const t = JSON.parse(localStorage.getItem(THEME_KEY)); if (t && t.palette && t.font) return t; } catch { /* ignore */ }
-  return { palette: 'parisian-noir', font: 'pirata' };
+  try {
+    const t = JSON.parse(localStorage.getItem(THEME_KEY));
+    if (t && PALETTES[t.palette] && FONTSETS[t.font]) return t;
+  } catch { /* ignore */ }
+  return { palette: 'parisian-noir', font: 'vintage' };
 }
 function applyTheme({ palette, font }) {
   const root = document.documentElement;
@@ -155,7 +171,13 @@ const FACTION = {
   purple: { title: 'Royalty',      sym: '♛' },
 };
 
-// A severed-head silhouette (bust) used for the faction pips.
+const _clamp = x => Math.max(0, Math.min(255, Math.round(x)));
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = _clamp(((n >> 16) & 255) + amt), g = _clamp(((n >> 8) & 255) + amt), b = _clamp((n & 255) + amt);
+  return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+}
+
 function HeadIcon({ color = 'currentColor', className }) {
   return (
     <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
@@ -164,12 +186,34 @@ function HeadIcon({ color = 'currentColor', className }) {
   );
 }
 
-function FactionPip({ color, count, title, sym }) {
+// A faction's collected heads shown in a tribe-colored basket with its emblem.
+function BasketPip({ color, count, title, sym }) {
+  const id = 'bg-' + color.replace('#', '');
   return (
-    <span className="fpip" title={`${title}: ${count} head${count === 1 ? '' : 's'}`}>
-      <HeadIcon color={color} className="fpip-head" />
-      <span className="fpip-sym">{sym}</span>
-      <span className="fpip-ct">{count}</span>
+    <span className="bpip" title={`${title}: ${count} head${count === 1 ? '' : 's'}`}>
+      <svg className="bpip-svg" viewBox="0 0 30 28" aria-hidden="true">
+        <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={shade(color, 48)} /><stop offset="1" stopColor={shade(color, -46)} />
+        </linearGradient></defs>
+        <path d="M5 10h20l-2.2 13.5a2.2 2.2 0 0 1-2.2 1.9H9.4a2.2 2.2 0 0 1-2.2-1.9z" fill={`url(#${id})`} stroke="rgba(0,0,0,.42)" strokeWidth="0.8" />
+        <ellipse cx="15" cy="10" rx="11" ry="2.6" fill={shade(color, 48)} stroke="rgba(0,0,0,.35)" strokeWidth="0.8" />
+        <path d="M7 15H23M8 19.5H22" stroke="rgba(0,0,0,.16)" strokeWidth="1" />
+      </svg>
+      <span className="bpip-sym">{sym}</span>
+      <span className="bpip-ct">{count}</span>
+    </span>
+  );
+}
+
+// Total points shown inside a black severed-head silhouette.
+function HeadScore({ value }) {
+  return (
+    <span className="headscore" title={`${value} points`}>
+      <svg className="hs-svg" viewBox="0 0 30 32" aria-hidden="true">
+        <path fill="#141210" stroke="rgba(0,0,0,.5)" strokeWidth="0.5"
+          d="M15 3.4a6 6 0 0 1 6 6c0 2.4-1.3 4.5-3.3 5.6l.6 2.5c3.8.7 6.5 2.8 6.5 5.6V27.4H5.2v-4.3c0-2.8 2.7-4.9 6.5-5.6l.6-2.5A6 6 0 0 1 9 9.4a6 6 0 0 1 6-6z" />
+      </svg>
+      <span className="hs-num">{value}</span>
     </span>
   );
 }
@@ -239,7 +283,7 @@ function Board({ game }) {
         <div className="controls">
           {!targeting && (
             <button className="btn primary" onClick={game.collectAndEnd}>
-              {G.line.length === 0 ? 'End turn →' : 'Off with their head! 🪓'}
+              {G.line.length === 0 ? 'End turn →' : 'Off with their head!'}
             </button>
           )}
           {targeting && <button className="btn" onClick={game.cancelTarget}>Cancel</button>}
@@ -318,7 +362,7 @@ function PlayerCard({ player, index, game, step, onInspect, onExpand }) {
       onClick={() => (playerTarget ? game.pick({ playerIdx: index }) : onExpand(index))}>
       <div className="pc-head">
         <span className="pc-name">{player.name}{G.cpu?.[index] ? ' 🤖' : ''}{isCurrent ? ' ◄' : ''}</span>
-        <span className="pc-score"><ScoreDelta value={total} />{total}</span>
+        <span className="pc-score"><ScoreDelta value={total} /><HeadScore value={total} /></span>
       </div>
       <div className="pc-stats">
         <span title="cards in hand">🖐 {player.hand.length}</span>
@@ -327,7 +371,7 @@ function PlayerCard({ player, index, game, step, onInspect, onExpand }) {
         </span>
         <span className="pc-tally">
           {colors.length === 0 ? <span className="muted small">no heads</span>
-            : colors.map(c => <FactionPip key={c} color={COLOR_HEX[c]} count={tally[c]} title={FACTION[c].title} sym={FACTION[c].sym} />)}
+            : colors.map(c => <BasketPip key={c} color={COLOR_HEX[c]} count={tally[c]} title={FACTION[c].title} sym={FACTION[c].sym} />)}
         </span>
       </div>
       {isCurrent && <TurnSteps G={G} />}
@@ -425,28 +469,39 @@ function GuillotineLine({ G, step, onPick, onInspect }) {
   );
 }
 
-// Top-down guillotine, turned to face the line (the next head enters from the left).
+// A detailed guillotine on a stepped platform, facing the line (stairs on the left).
 function Guillotine() {
   return (
     <div className="guillo-wrap" title="The guillotine — the next head drops here">
-      <svg className="guillo" viewBox="0 0 140 92" aria-label="guillotine">
-        {/* bascule plank — the victim slides in from the line (left) */}
-        <rect x="2" y="31" width="64" height="30" rx="3" fill="#5f5147" stroke="#3d342c" strokeWidth="2" />
-        <line x1="2" y1="46" x2="66" y2="46" stroke="#4a3f36" strokeWidth="1.2" />
-        {/* frame rails (top & bottom) + far upright */}
-        <rect x="58" y="7" width="76" height="11" rx="2" fill="#7c8186" stroke="#54595d" strokeWidth="1.4" />
-        <rect x="58" y="74" width="76" height="11" rx="2" fill="#7c8186" stroke="#54595d" strokeWidth="1.4" />
-        <rect x="123" y="7" width="12" height="78" rx="2" fill="#6c7175" stroke="#4e5256" strokeWidth="1.4" />
-        {/* blade (mouton), edge facing left toward the neck */}
-        <rect x="96" y="30" width="18" height="32" fill="#9aa0a4" stroke="#6e7377" />
-        <polygon points="96,30 96,62 84,54 84,38" fill="#d2d6d9" stroke="#aeb3b6" />
-        {/* lunette (neck hole) between plank and blade */}
-        <circle cx="72" cy="46" r="12" fill="#241a14" />
-        <path d="M72 34 a12 12 0 0 1 0 24" fill="none" stroke="#c6a765" strokeWidth="3" />
-        <path d="M72 34 a12 12 0 0 0 0 24" fill="none" stroke="#9c7d3e" strokeWidth="3" />
-        {/* rust */}
-        <circle cx="26" cy="38" r="3" fill="#7a3b1e" opacity=".5" />
-        <circle cx="128" cy="68" r="3" fill="#7a3b1e" opacity=".4" />
+      <svg className="guillo" viewBox="0 0 132 158" aria-label="guillotine">
+        {/* stairs leading up from the line (left) */}
+        <rect x="2" y="140" width="18" height="7" fill="#5a4330" stroke="#3f2f22" strokeWidth="0.8" />
+        <rect x="8" y="133" width="18" height="7" fill="#654b36" stroke="#3f2f22" strokeWidth="0.8" />
+        <rect x="14" y="126" width="18" height="7" fill="#6f543c" stroke="#3f2f22" strokeWidth="0.8" />
+        {/* platform (scaffold) */}
+        <polygon points="30,118 122,118 130,128 22,128" fill="#79593c" stroke="#3f2f22" strokeWidth="1" />
+        <rect x="22" y="128" width="108" height="14" fill="#5a4330" stroke="#3f2f22" strokeWidth="1" />
+        <line x1="46" y1="128" x2="46" y2="142" stroke="#43321f" strokeWidth="1" />
+        <line x1="78" y1="128" x2="78" y2="142" stroke="#43321f" strokeWidth="1" />
+        <line x1="110" y1="128" x2="110" y2="142" stroke="#43321f" strokeWidth="1" />
+        {/* uprights */}
+        <rect x="50" y="12" width="11" height="108" rx="1" fill="#44321f" stroke="#2c2015" strokeWidth="1" />
+        <rect x="88" y="12" width="11" height="108" rx="1" fill="#44321f" stroke="#2c2015" strokeWidth="1" />
+        {/* top crossbeam */}
+        <rect x="44" y="6" width="61" height="13" rx="2" fill="#4f3a26" stroke="#2c2015" strokeWidth="1" />
+        {/* rope */}
+        <line x1="74" y1="19" x2="74" y2="30" stroke="#caa66a" strokeWidth="1.6" />
+        {/* mouton + angled blade */}
+        <rect x="56" y="30" width="38" height="15" fill="#8d9398" stroke="#5c6165" strokeWidth="1" />
+        <polygon points="56,45 94,45 94,61 56,47" fill="#d7dbde" stroke="#a9aeb1" strokeWidth="1" />
+        <polygon points="56,45 94,45 90,49 56,47" fill="#eef1f3" opacity=".7" />
+        {/* lunette — the neck hole */}
+        <circle cx="74.5" cy="96" r="12" fill="#17110c" />
+        <path d="M63 96a11.5 11.5 0 0 1 23 0" fill="none" stroke="#c6a765" strokeWidth="3" />
+        <path d="M63 96a11.5 11.5 0 0 0 23 0" fill="none" stroke="#8f7236" strokeWidth="3" />
+        {/* basket for the heads */}
+        <path d="M58 112h33l-3.5 12a2 2 0 0 1-2 1.5H63.5a2 2 0 0 1-2-1.5z" fill="#8a6a3f" stroke="#5a4330" strokeWidth="1" />
+        <path d="M60 117h29M61 121h27" stroke="rgba(0,0,0,.2)" strokeWidth="0.8" />
       </svg>
       <span className="guillo-label">GUILLOTINE</span>
     </div>
@@ -510,21 +565,13 @@ function NoblePileModal({ G, index, game, step, onInspect, forced, close }) {
   );
 }
 
-// A big preview that pops up right next to the card you're hovering.
+// A big preview in one consistent spot (screen center) so the eye always knows
+// where to look — never jumping around the hovered card.
 function HoverCard({ inspect }) {
   if (!inspect) return null;
-  const { rect, img, name, sub, text, color } = inspect;
-  const CW = 230;
-  const vw = typeof window !== 'undefined' ? window.innerWidth : 1000;
-  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-  let left = rect ? rect.left + rect.width / 2 - CW / 2 : 20;
-  left = Math.max(8, Math.min(vw - CW - 8, left));
-  const placeBelow = rect ? (rect.top < 320 && (vh - rect.bottom) > rect.top) : false;
-  const style = rect
-    ? (placeBelow ? { left, top: rect.bottom + 10 } : { left, bottom: vh - rect.top + 10 })
-    : { left: 20, top: 70 };
+  const { img, name, sub, text, color } = inspect;
   return (
-    <div className="hovercard" style={{ ...style, width: CW }}>
+    <div className="hovercard center">
       <img className="hc-img" src={img} alt={name} style={{ borderColor: color }} />
       <div className="hc-name">{name}</div>
       <div className="hc-sub" style={{ color }}>{sub}</div>
