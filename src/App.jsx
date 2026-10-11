@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useReducer } from 'react';
 import './App.css';
 import { useGame } from './hooks/useGame';
 import {
@@ -6,7 +6,8 @@ import {
   nobleImg, actionImg, NOBLE_BACK, ACTION_BACK,
 } from './data/cards';
 import { computeScore } from './utils/scoring';
-import { judgeBlocks, callousActive, lineNobleCandidates } from './utils/effects';
+import { judgeBlocks, callousActive, lineNobleCandidates, getStep, canPlayCard } from './utils/effects';
+import { HostRoom, JoinClient, cleanCode } from './net/room';
 import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner, DealFlier, setReduce } from './Effects';
 import { playBehead, playWhoosh, playBell, isMuted, toggleMuted } from './sound';
 
@@ -102,6 +103,13 @@ export default function App() {
     setSpeed(s); try { localStorage.setItem('guillotine-speed', String(s)); } catch { /* ignore */ }
   };
 
+  // Online: null = local play; else { kind:'home'|'host'|'join', room? }
+  const [online, setOnline] = useState(null);
+  const exitOnline = () => { try { online?.room?.close(); } catch { /* ignore */ } setOnline(null); };
+  useEffect(() => {
+    try { if (new URLSearchParams(window.location.search).get('join')) setOnline({ kind: 'home' }); } catch { /* ignore */ }
+  }, []);
+
   // No handoff screen for now — advance straight into the next turn.
   useEffect(() => {
     if (G.phase === 'pass') {
@@ -135,9 +143,19 @@ export default function App() {
       </header>
       {showTheme && <ThemeSheet theme={theme} setTheme={setTheme} close={() => setShowTheme(false)} />}
       {showHelp && <HelpSheet close={() => setShowHelp(false)} reduce={reduce} setReduce={setReduceState} />}
-      {G.phase === 'start' && <StartScreen onStart={game.start} />}
-      {G.phase === 'gameOver' && <GameOver G={G} onRestart={game.restart} />}
-      {(G.phase === 'playing' || G.phase === 'targeting' || G.phase === 'pass') && <Board game={game} />}
+      {online ? (
+        online.kind === 'home'
+          ? <OnlineHome onHost={(room) => setOnline({ kind: 'host', room })} onJoin={(room) => setOnline({ kind: 'join', room })} onBack={() => setOnline(null)} />
+          : online.kind === 'host'
+            ? <HostShell room={online.room} speed={speed} onExit={exitOnline} />
+            : <ClientShell client={online.room} onExit={exitOnline} />
+      ) : (
+        <>
+          {G.phase === 'start' && <StartScreen onStart={game.start} onOnline={() => setOnline({ kind: 'home' })} />}
+          {G.phase === 'gameOver' && <GameOver G={G} onRestart={game.restart} />}
+          {(G.phase === 'playing' || G.phase === 'targeting' || G.phase === 'pass') && <Board game={game} />}
+        </>
+      )}
       <BugReport game={game} />
       <RotateHint />
     </div>
@@ -177,7 +195,7 @@ function makeSeats(n, prev) {
   return out;
 }
 
-function StartScreen({ onStart }) {
+function StartScreen({ onStart, onOnline }) {
   const [count, setCount] = useState(3);
   const [seats, setSeats] = useState(() => makeSeats(3));
   const setCountN = (n) => { setCount(n); setSeats(s => makeSeats(n, s)); };
@@ -219,8 +237,11 @@ function StartScreen({ onStart }) {
           </div>
         ))}
       </div>
-      <button className="btn primary start-btn" onClick={go}>Start Game</button>
-      <p className="muted small resist-note">CPU players are code-named Résistants — set each one's nerve from Recrue to Maquisard.</p>
+      <div className="start-buttons">
+        <button className="btn primary start-btn" onClick={go}>Start Game</button>
+        {onOnline && <button className="btn start-btn online-btn" onClick={onOnline}>Play Online →</button>}
+      </div>
+      <p className="muted small resist-note">CPU players are code-named Résistants — set each one's nerve from Recrue to Maquisard. Or play online with friends.</p>
     </div>
   );
 }
@@ -662,7 +683,8 @@ function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint }
     if (el) el.scrollLeft = el.scrollWidth;
   }, [G.line.length, G.phase]);
 
-  const canBehead = G.phase === 'playing' && !targeting && !G.cpu?.[G.current];
+  const activeIsMe = game.seat == null || G.current === game.seat;
+  const canBehead = G.phase === 'playing' && !targeting && !G.cpu?.[G.current] && activeIsMe;
   const cta = G.line.length === 0 ? 'End turn' : 'Off with their head!';
   return (
     <div className="line-area">
@@ -778,7 +800,9 @@ function DeckPile({ kind, count, label }) {
 // ─── The logged-in player's action-card hand ────────────────────────────────
 function HandDock({ game, onInspect }) {
   const { G } = game;
+  const activeIsMe = game.seat == null || G.current === game.seat;
   if (G.cpu?.[G.current]) return <div className="hand-dock cpu">{G.players[G.current].name} is thinking…</div>;
+  if (!activeIsMe) return <div className="hand-dock cpu">Waiting for {G.players[G.current].name}…</div>;
   const hand = G.players[G.current].hand;
   const n = hand.length;
   return (
@@ -861,6 +885,129 @@ function HoverCard({ inspect, onKeep, onLeave, onClose }) {
       </div>
     </>
   );
+}
+
+// ─── Online multiplayer (PeerJS, host-authoritative — mirrors Long Shot) ─────
+function useLive(obj) {
+  const [, bump] = useReducer((x) => x + 1, 0);
+  useEffect(() => (obj ? obj.on(bump) : undefined), [obj]);
+}
+
+function OnlineHome({ onHost, onJoin, onBack }) {
+  const joinCode = cleanCode(new URLSearchParams(location.search).get('join') || '');
+  const [tab, setTab] = useState(joinCode ? 'join' : 'host');
+  const [name, setName] = useState(() => { try { return localStorage.getItem('guillotine-name') || 'You'; } catch { return 'You'; } });
+  const [code, setCode] = useState(joinCode);
+  const save = (n) => { setName(n); try { localStorage.setItem('guillotine-name', n); } catch { /* ignore */ } };
+  const host = () => onHost(new HostRoom(name.trim() || 'You'));
+  const join = () => { const c = cleanCode(code); if (c.length === 5) onJoin(new JoinClient(c, name.trim() || 'Friend')); };
+  return (
+    <div className="screen center online-home">
+      <img className="start-logo" src="/logo-title.png" alt="Guillotine" />
+      <div className="oh-tabs">
+        <button className={'mode-btn' + (tab === 'host' ? ' on' : '')} onClick={() => setTab('host')}>Host a game</button>
+        <button className={'mode-btn' + (tab === 'join' ? ' on' : '')} onClick={() => setTab('join')}>Join with a code</button>
+      </div>
+      <label className="oh-field"><span>Your name</span>
+        <input value={name} maxLength={14} onChange={(e) => save(e.target.value)} /></label>
+      {tab === 'join' && (
+        <label className="oh-field"><span>Room code</span>
+          <input className="oh-code" value={code} maxLength={5} placeholder="ABCDE"
+            onChange={(e) => setCode(cleanCode(e.target.value))} /></label>
+      )}
+      {tab === 'host'
+        ? <button className="btn primary start-btn" onClick={host}>Create room</button>
+        : <button className="btn primary start-btn" onClick={join} disabled={cleanCode(code).length !== 5}>Join room</button>}
+      <button className="btn" onClick={onBack}>← Back</button>
+    </div>
+  );
+}
+
+// Lobby — host sees controls + the room code; a friend sees the seats and waits.
+function Lobby({ room, isHost, code, seats, onStart, onExit }) {
+  const copy = () => { try { navigator.clipboard.writeText(`${location.origin}/?join=${code}`); } catch { /* ignore */ } };
+  const canStart = isHost && seats.length >= 2 && seats.every((s) => s.kind !== 'remote' || s.connected);
+  return (
+    <div className="screen center lobby">
+      <h2>Online lobby</h2>
+      <div className="lobby-code" onClick={copy} title="Copy invite link">
+        <span className="lc-label">Room code</span>
+        <span className="lc-code">{code || '…'}</span>
+        <span className="lc-copy">tap to copy invite link</span>
+      </div>
+      <div className="lobby-seats">
+        {seats.map((s, i) => (
+          <div key={i} className={'lseat ' + s.kind}>
+            <span className="ls-name">{s.name}
+              <span className="ls-tag">{s.kind === 'host' ? 'host' : s.kind === 'ai' ? 'CPU' : (s.connected ? 'online' : 'offline')}</span></span>
+            {isHost && s.kind === 'ai' && (
+              <span className="seat-diffs">
+                {DIFFS.map((d) => <button key={d.key} className={'diff-btn' + ((s.level ?? 1) === d.key ? ' on' : '')}
+                  onClick={() => room.setLevel(i, d.key)}>{d.label}</button>)}
+              </span>
+            )}
+            {isHost && s.kind !== 'host' && <button className="btn small" onClick={() => room.removeSeat(i)}>Remove</button>}
+          </div>
+        ))}
+      </div>
+      {isHost ? (
+        <div className="lobby-actions">
+          <button className="btn" onClick={() => room.addComputer()} disabled={seats.length >= 5}>+ Add CPU</button>
+          <button className="btn primary" onClick={onStart} disabled={!canStart}>Start Game</button>
+        </div>
+      ) : <p className="muted">Waiting for the host to start…</p>}
+      <button className="btn" onClick={onExit}>Leave</button>
+    </div>
+  );
+}
+
+function HostShell({ room, speed, onExit }) {
+  useLive(room);
+  const game = useGame();
+  const { G } = game;
+  useEffect(() => { room.game = game; if (room.started) room.pushState(); });  // keep engine fresh + broadcast
+  useEffect(() => {
+    if (G.phase === 'pass') { const t = setTimeout(() => game.advanceFromPass(), 0); return () => clearTimeout(t); }
+  }, [G.phase, G.current, G.day]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (G.phase !== 'playing' || !G.cpu?.[G.current]) return;
+    const t = setTimeout(() => { if (G.actionPlayed) game.collectAndEnd(); else game.cpuPlay(); }, Math.round(1300 / speed));
+    return () => clearTimeout(t);
+  }, [G.phase, G.current, G.day, G.actionPlayed, speed]); // eslint-disable-line react-hooks/exhaustive-deps
+  const start = () => { const [names, cpu, lvl] = room.setupArgs(); game.start(names, cpu, lvl); room.markStarted(); };
+  if (!room.started || G.phase === 'start')
+    return <Lobby room={room} isHost code={room.code} seats={room.seats} onStart={start} onExit={onExit} />;
+  if (G.phase === 'gameOver') return <GameOver G={G} onRestart={onExit} />;
+  return <Board game={{ ...game, seat: 0 }} />;
+}
+
+function ClientShell({ client, onExit }) {
+  useLive(client);
+  if (client.status === 'error' || client.status === 'ended')
+    return (<div className="screen center"><h2>Disconnected</h2><p className="muted">{client.error}</p>
+      {client.status === 'error' && <button className="btn primary" onClick={() => client.rejoin()}>Try again</button>}
+      <button className="btn" onClick={onExit}>Leave</button></div>);
+  if (!client.G || ['lobby', 'connecting', 'reconnecting'].includes(client.status)) {
+    if (client.lobby && client.status === 'lobby')
+      return <Lobby isHost={false} code={client.lobby.code} seats={client.lobby.seats} onExit={onExit} />;
+    return (<div className="screen center"><h2>{client.status === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'}</h2>
+      <button className="btn" onClick={onExit}>Leave</button></div>);
+  }
+  const G = client.G, seat = client.you;
+  const facade = {
+    G, seat,
+    step: () => (G.phase === 'targeting' && G.pending) ? getStep(ACTION_BY_ID[G.pending.defId], G, G.pending.picks) : null,
+    canPlay: (hi) => { if (G.phase !== 'playing' || G.actionPlayed || G.current !== seat) return false; const inst = G.players[seat]?.hand[hi]; return inst && !inst.hidden ? canPlayCard(G, ACTION_BY_ID[inst.defId]) : false; },
+    canUndo: () => false, undo: () => {}, restart: () => {},
+    playCard: (hi) => client.action('playCard', [hi]),
+    pick: (v) => client.action('pick', [v]),
+    cancelTarget: () => client.action('cancelTarget', []),
+    collectAndEnd: () => client.action('collectAndEnd', []),
+    discardFront: (uid) => client.action('discardFront', [uid]),
+    advanceFromPass: () => {}, cpuPlay: () => {}, score: (p) => computeScore(p),
+  };
+  if (G.phase === 'gameOver') return <GameOver G={G} onRestart={onExit} />;
+  return <Board game={facade} />;
 }
 
 const TRACKS = [
