@@ -743,5 +743,73 @@
 [data-reduce="1"] *, [data-reduce="1"] *::before, [data-reduce="1"] *::after {
   animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important;
 }
-[data-reduce="1"] .day-banner, [data-reduce="1"] .callout, [data-reduce="1"] .db-sweep { display: none; }
+[data-reduce="1"] .day-banner, [data-reduce="1"] .callout, [data-reduce="1"] .db-sweep, [data-reduce="1"] .day-clock { display: none; }
 .help-toggle { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; cursor: pointer; }
+
+/* ================================================================
+   Real art + Carter/Merriweather + clock-wipe transition (latest)
+   ================================================================ */
+
+/* logo is a transparent wordmark — no card frame */
+.topbar-logo { height: 40px; width: auto; border-radius: 0; box-shadow: none; }
+.start-logo { width: min(92vw, 520px); height: auto; border-radius: 0; box-shadow: none;
+  filter: drop-shadow(0 10px 26px rgba(0,0,0,.6)); }
+
+/* faction basket pip — real tribe-coloured basket art + head count */
+.pc-tally { gap: 8px; align-items: center; }
+.bpip { position: relative; display: inline-block; width: 36px; height: 36px; }
+.bpip-img { width: 100%; height: 100%; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+.bpip-ct {
+  position: absolute; left: 0; right: 0; bottom: 1px; text-align: center;
+  font-family: var(--font-head); font-weight: 400; font-size: 13px; color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,.95), 0 0 3px rgba(0,0,0,.85); pointer-events: none;
+}
+
+/* total points over the severed-head silhouette (real art) */
+.headscore { position: relative; display: inline-block; width: 32px; height: 38px; }
+.hs-img { width: 100%; height: 100%; display: block; object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
+.hs-num {
+  position: absolute; left: 0; right: 0; top: 54%; transform: translateY(-50%); text-align: center;
+  font-family: var(--font-head); font-weight: 400; font-size: 14px; color: var(--gold);
+  text-shadow: 0 1px 2px #000, 0 0 4px #000; pointer-events: none;
+}
+.go-score .headscore { width: 38px; height: 44px; }
+.go-score .hs-num { font-size: 16px; }
+
+/* hover preview — faction emblem + Play button */
+.hovercard.center { width: 320px; }
+.hc-imgwrap { position: relative; display: block; }
+.hc-emblem {
+  position: absolute; right: -12px; top: -12px; width: 46px; height: 46px; box-sizing: border-box;
+  background: var(--panel); border: 2px solid var(--gold); border-radius: 50%; padding: 7px;
+  filter: drop-shadow(0 2px 5px rgba(0,0,0,.8));
+}
+.hc-play { width: 100%; margin-top: 12px; font-size: 16px; padding: 10px 12px; cursor: pointer; }
+
+/* "Off with their head!" button wears the blade */
+.behead-btn { display: inline-flex; align-items: center; gap: 9px; }
+.behead-blade { height: 28px; width: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
+
+/* ===== clock-wipe day transition (rooster crows at dawn) ===== */
+@property --dca { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@property --dcb { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.day-clock {
+  position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; pointer-events: none;
+  background: radial-gradient(130% 130% at 50% 38%, color-mix(in srgb, var(--accent) 86%, #000) 0%, #120b09 100%);
+  color: var(--gold);
+  --dca: 0deg; --dcb: 0deg;
+  -webkit-mask: conic-gradient(from -90deg, transparent 0 var(--dca), #000 var(--dca) var(--dcb), transparent var(--dcb) 360deg);
+          mask: conic-gradient(from -90deg, transparent 0 var(--dca), #000 var(--dca) var(--dcb), transparent var(--dcb) 360deg);
+  animation: dayClock 2.1s ease-in-out forwards;
+}
+@keyframes dayClock {
+  0%   { --dca: 0deg; --dcb: 0deg; }
+  28%  { --dca: 0deg; --dcb: 360deg; }
+  70%  { --dca: 0deg; --dcb: 360deg; }
+  100% { --dca: 360deg; --dcb: 360deg; }
+}
+.dc-face { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.dc-day { font-family: var(--font-display); font-size: 64px; line-height: 1; text-shadow: 0 4px 20px rgba(0,0,0,.9); }
+.dc-sub { font-family: var(--font-head); font-size: 20px; color: var(--cream); margin-top: 2px; }
+.dc-fleur { font-size: 32px; color: var(--gold); }

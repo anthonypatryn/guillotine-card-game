@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="302.4 313.2 132.8 110.6"><defs>
+    <style>
+      .st0 {
+        fill: #fff;
+        font-size: 79.9px;
+      }
+
+      .st0, .st1 {
+        font-family: SuperBouncer-Regular, 'Super Bouncer';
+      }
+
+      .st1 {
+        font-size: 47.7px;
+      }
+
+      .st2 {
+        fill: url(#linear-gradient2);
+      }
+
+      .st3 {
+        fill: url(#linear-gradient1);
+      }
+
+      .st4 {
+        mix-blend-mode: multiply;
+        opacity: .3;
+      }
+
+      .st5 {
+        fill: #bf00ed;
+      }
+
+      .st6 {
+        fill: #199b2e;
+      }
+
+      .st7 {
+        fill: url(#radial-gradient);
+      }
+
+      .st8 {
+        fill: url(#linear-gradient);
+      }
+
+      .st9 {
+        fill: #774c00;
+      }
+
+      .st10 {
+        isolation: isolate;
+      }
+
+      .st11 {
+        fill: #00aeef;
+      }
+
+      .st12 {
+        fill: #4c3612;
+      }
+
+      .st13 {
+        fill: #848484;
+      }
+
+      .st14 {
+        fill: url(#radial-gradient1);
+      }
+
+      .st15 {
+        fill: url(#radial-gradient3);
+      }
+
+      .st16 {
+        fill: url(#radial-gradient2);
+      }
+
+      .st17 {
+        fill: none;
+        stroke: #d8bb12;
+        stroke-miterlimit: 10;
+        stroke-width: 4px;
+      }
+
+      .st18 {
+        fill: #e02b1d;
+      }
+    </style>
+    <linearGradient id="linear-gradient" x1="336.2" y1="355.3" x2="442.9" y2="407.6" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#848484"/>
+      <stop offset=".3" stop-color="#dadbdc"/>
+      <stop offset=".6" stop-color="#848484"/>
+      <stop offset="1" stop-color="#67696a"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient1" x1="351.1" y1="380.9" x2="417.6" y2="447.4" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#bababa"/>
+      <stop offset=".3" stop-color="#fff"/>
+      <stop offset="1" stop-color="#929394"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient2" x1="368.4" y1="347.8" x2="368.4" y2="333.2" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#020202" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient" cx="420.9" cy="329.4" fx="420.9" fy="329.4" r="9.9" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffcdf"/>
+      <stop offset=".3" stop-color="#d8bb12"/>
+      <stop offset="1" stop-color="#332d04"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient1" cx="387.6" fx="387.6" xlink:href="#radial-gradient"/>
+    <radialGradient id="radial-gradient2" cx="354.3" fx="354.3" r="9.9" xlink:href="#radial-gradient"/>
+    <radialGradient id="radial-gradient3" cx="320.9" fx="320.9" xlink:href="#radial-gradient"/>
+  </defs><g style="isolation:isolate"><g>
+        <circle class="st17" cx="368.8" cy="321.6" r="5.4"/>
+        <rect class="st12" x="309.2" y="332.3" width="119.3" height="19.6" rx="2" ry="2"/>
+        <polygon class="st8" points="421.4 380.7 315.3 410.9 315.3 331.3 421.4 331.3 421.4 380.7"/>
+        <polygon class="st3" points="315.3 405.8 421.4 375.6 421.4 390.7 315.3 420.8 315.3 405.8"/>
+        <rect class="st9" x="305.4" y="322.5" width="126.8" height="19.6" rx="2" ry="2"/>
+        <rect class="st2" x="315.3" y="342.2" width="106.1" height="6.9"/>
+        <circle class="st7" cx="419" cy="332.3" r="5.4"/>
+        <circle class="st14" cx="385.7" cy="332.3" r="5.4"/>
+        <circle class="st16" cx="352.3" cy="332.3" r="5.4"/>
+        <circle class="st15" cx="319" cy="332.3" r="5.4"/>
+      </g></g></svg>

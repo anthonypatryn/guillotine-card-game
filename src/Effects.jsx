@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
 import { NOBLE_BY_ID, COLOR_HEX, nobleImg } from './data/cards';
+import { playRooster } from './sound';
 
 let _reduce = typeof matchMedia !== 'undefined'
   && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -141,14 +142,17 @@ export function ScoreDelta({ value }) {
   </span>;
 }
 
+// A clock wipe to a solid panel showing the day (rooster crows at dawn), then
+// the clock wipes back to reveal the board.
 export function DayBanner({ day }) {
+  useEffect(() => { if (!_reduce) playRooster(); }, [day]);
   return (
-    <div className="day-banner" key={day}>
-      <div className="db-sweep" />
-      <div className="db-inner">
-        <span className="db-fleur">⚜</span>
-        <span className="db-text">Day {day} <span className="db-sub">of 3</span></span>
-        <span className="db-fleur">⚜</span>
+    <div className="day-clock" key={day} aria-hidden="true">
+      <div className="dc-face">
+        <span className="dc-fleur">⚜</span>
+        <span className="dc-day">Day {day}</span>
+        <span className="dc-sub">of 3</span>
+        <span className="dc-fleur">⚜</span>
       </div>
     </div>
   );

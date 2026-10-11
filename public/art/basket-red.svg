@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="245.2 32.8 104.2 106.2"><defs>
+    <style>
+      .st0 {
+        fill: #fff;
+        font-size: 79.9px;
+      }
+
+      .st0, .st1 {
+        font-family: SuperBouncer-Regular, 'Super Bouncer';
+      }
+
+      .st1 {
+        font-size: 47.7px;
+      }
+
+      .st2 {
+        fill: url(#linear-gradient2);
+      }
+
+      .st3 {
+        fill: url(#linear-gradient1);
+      }
+
+      .st4 {
+        mix-blend-mode: multiply;
+        opacity: .3;
+      }
+
+      .st5 {
+        fill: #bf00ed;
+      }
+
+      .st6 {
+        fill: #199b2e;
+      }
+
+      .st7 {
+        fill: url(#radial-gradient);
+      }
+
+      .st8 {
+        fill: url(#linear-gradient);
+      }
+
+      .st9 {
+        fill: #774c00;
+      }
+
+      .st10 {
+        isolation: isolate;
+      }
+
+      .st11 {
+        fill: #00aeef;
+      }
+
+      .st12 {
+        fill: #4c3612;
+      }
+
+      .st13 {
+        fill: #848484;
+      }
+
+      .st14 {
+        fill: url(#radial-gradient1);
+      }
+
+      .st15 {
+        fill: url(#radial-gradient3);
+      }
+
+      .st16 {
+        fill: url(#radial-gradient2);
+      }
+
+      .st17 {
+        fill: none;
+        stroke: #d8bb12;
+        stroke-miterlimit: 10;
+        stroke-width: 4px;
+      }
+
+      .st18 {
+        fill: #e02b1d;
+      }
+    </style>
+    <linearGradient id="linear-gradient" x1="336.2" y1="355.3" x2="442.9" y2="407.6" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#848484"/>
+      <stop offset=".3" stop-color="#dadbdc"/>
+      <stop offset=".6" stop-color="#848484"/>
+      <stop offset="1" stop-color="#67696a"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient1" x1="351.1" y1="380.9" x2="417.6" y2="447.4" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#bababa"/>
+      <stop offset=".3" stop-color="#fff"/>
+      <stop offset="1" stop-color="#929394"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient2" x1="368.4" y1="347.8" x2="368.4" y2="333.2" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#020202" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient" cx="420.9" cy="329.4" fx="420.9" fy="329.4" r="9.9" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffcdf"/>
+      <stop offset=".3" stop-color="#d8bb12"/>
+      <stop offset="1" stop-color="#332d04"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient1" cx="387.6" fx="387.6" xlink:href="#radial-gradient"/>
+    <radialGradient id="radial-gradient2" cx="354.3" fx="354.3" r="9.9" xlink:href="#radial-gradient"/>
+    <radialGradient id="radial-gradient3" cx="320.9" fx="320.9" xlink:href="#radial-gradient"/>
+  </defs><g style="isolation:isolate"><g id="UZ4a6q">
+        <path class="st18" d="M324.6,131.3c-11,5.7-25.4,6.5-37.7,5.1-13.6-1.5-25.9-7-31.9-19.8s-5.4-17.7-4.9-27c-2.3-1.3-3.5-3.8-2.7-6.2s2.9-3.8,5.7-3.6c1.3-16.7,9.9-32.6,25-40.7s37.6-4.8,50.6,10.2c7.4,8.5,11.7,19.1,12.8,30.5,2.6-.3,4.8,1.1,5.6,3.3s0,5.3-2.6,6.5c.2,2.2.3,4.4.1,6.6-1.2,14.9-6.3,28.1-20,35.2ZM259,81c25.6,5,51.3,5,76.6,0-1.6-17-11-32.9-27.3-38.9-6.8-2.5-13.9-2.6-20.9-.5-17.2,5.6-27.2,21.5-28.4,39.4Z"/>
+      </g><path class="st4" d="M313.8,124c-.1-1.5-1.5-2.7-3-2.5l-3.5-3.5,2.7-2.7c.7-.8.7-1.9,0-2.7l-1.1-1.1c-.1-.1-.3-.2-.5,0l-2.1,2.1-3-3.1,10.3-10.3.2-4.8v-1c0,0,0-.2,0-.3,0,0-.2,0-.3-.1-.3,0-.6,0-.9,0l-4.9.3-10.3,10.3-10.3-10.3-4.9-.3c-.3,0-.6,0-.9,0-.2,0-.4,0-.5.2v.5s0,.1,0,.1v1c0,.3,0,.5,0,.8l.2,3.6,10.3,10.3-3.1,3.1-2.2-2.2c-.1,0-.3,0-.4,0l-1.2,1.2c-.7.8-.7,1.9,0,2.7l2.7,2.7-3.5,3.5c-1.6-.2-2.9.9-3.1,2.4v.6c.1,1.3,1.2,2.3,2.5,2.5h.6c1.5-.2,2.6-1.5,2.4-3.1l3.5-3.5,2.7,2.7c.8.7,1.9.8,2.7,0l1.2-1.2c.1,0,.1-.3,0-.4l-2.1-2.1,3.1-3.1,3.1,3.1-2.2,2.2c0,.1,0,.3,0,.4l1.2,1.2c.8.7,2,.7,2.7,0l2.6-2.6,3.5,3.5c-.1,1.5.9,2.9,2.4,3.1h.6c1.5-.2,2.6-1.5,2.5-3Z"/></g></svg>

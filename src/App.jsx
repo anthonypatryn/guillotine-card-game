@@ -8,7 +8,7 @@ import {
 import { computeScore } from './utils/scoring';
 import { judgeBlocks, callousActive } from './utils/effects';
 import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner, setReduce } from './Effects';
-import { playBehead, playWhoosh, isMuted, toggleMuted } from './sound';
+import { playBehead, playWhoosh, playBell, isMuted, toggleMuted } from './sound';
 
 // ─── Themes: color palettes + font sets (chosen in the Theme sheet) ─────────
 const PALETTES = {
@@ -39,6 +39,7 @@ const PALETTES = {
 };
 // Headings & body are chosen independently so you can dial in the exact look.
 const HEAD_FONTS = {
+  carter:    { name: 'Carter One',  css: "'Carter One', Georgia, serif" },
   fraunces:  { name: 'Fraunces',    css: "'Fraunces', Georgia, serif" },
   playfair:  { name: 'Playfair',    css: "'Playfair Display', Georgia, serif" },
   bodoni:    { name: 'Bodoni',      css: "'Bodoni Moda', Georgia, serif" },
@@ -50,6 +51,7 @@ const HEAD_FONTS = {
   rye:       { name: 'Rye',         css: "'Rye', serif" },
 };
 const BODY_FONTS = {
+  merriweather: { name: 'Merriweather',     css: "'Merriweather', Georgia, serif" },
   shantell:  { name: 'Shantell (handmade)', css: "'Shantell Sans', system-ui, sans-serif" },
   jost:      { name: 'Jost',                css: "'Jost', system-ui, sans-serif" },
   garamond:  { name: 'EB Garamond',         css: "'EB Garamond', Georgia, serif" },
@@ -59,9 +61,13 @@ const THEME_KEY = 'guillotine-theme';
 function loadTheme() {
   try {
     const t = JSON.parse(localStorage.getItem(THEME_KEY));
-    if (t && PALETTES[t.palette] && HEAD_FONTS[t.head] && BODY_FONTS[t.body]) return t;
+    if (t && PALETTES[t.palette] && HEAD_FONTS[t.head] && BODY_FONTS[t.body]) {
+      // migrate anyone still on the old default fonts to Carter One / Merriweather
+      if (t.head === 'fraunces' && t.body === 'shantell') { t.head = 'carter'; t.body = 'merriweather'; }
+      return t;
+    }
   } catch { /* ignore */ }
-  return { palette: 'parisian-noir', head: 'fraunces', body: 'shantell' };
+  return { palette: 'parisian-noir', head: 'carter', body: 'merriweather' };
 }
 function applyTheme({ palette, head, body }) {
   const root = document.documentElement;
@@ -117,7 +123,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <img className="topbar-logo" src="/logo.jpg" alt="Guillotine" />
+        <img className="topbar-logo" src="/logo-title.png" alt="Guillotine" />
         <span className="tagline">win by getting a head</span>
         <button className="nav-btn" onClick={() => setShowHelp(true)} title="How to play">?</button>
         <button className="nav-btn" onClick={toggleSpeed} title="CPU speed">{speed}×</button>
@@ -147,7 +153,7 @@ function StartScreen({ onStart }) {
   const pickMode = (m) => { setMode(m); setNames(MODES[m].names); };
   return (
     <div className="screen center">
-      <img className="start-logo" src="/logo.jpg" alt="Guillotine" />
+      <img className="start-logo" src="/logo-title.png" alt="Guillotine" />
       <p className="muted">The revolutionary card game where you win by getting a head.</p>
       <div className="mode-pick">
         {Object.entries(MODES).map(([k, m]) => (
@@ -169,6 +175,7 @@ function StartScreen({ onStart }) {
 }
 
 function GameOver({ G, onRestart }) {
+  useEffect(() => { playBell(0.7); }, []);
   const awards = accolades(G.players);
   const rows = G.players.map((p, i) => ({ name: p.name, total: computeScore(p).total, idx: i }))
     .sort((a, b) => b.total - a.total);
@@ -199,8 +206,8 @@ function GameOver({ G, onRestart }) {
   );
 }
 
-const nobleInspect = (def, el) => ({ img: nobleImg(def.id), name: def.name, sub: `${COLORS[def.color]} · ${FACTION[def.color].title}`, text: def.text, color: COLOR_HEX[def.color], rect: el?.getBoundingClientRect() });
-const actionInspect = (def, el) => ({ img: actionImg(def.id), name: def.name, sub: 'Action card', text: def.text, color: '#b4323d', rect: el?.getBoundingClientRect() });
+const nobleInspect = (def, el) => ({ img: nobleImg(def.id), name: def.name, faction: def.color, factionName: FACTION[def.color].title, text: def.text, color: COLOR_HEX[def.color], rect: el?.getBoundingClientRect() });
+const actionInspect = (def, el) => ({ img: actionImg(def.id), name: def.name, text: def.text, color: '#b4323d', rect: el?.getBoundingClientRect() });
 
 // Faction = noble color. Each has a title and an emblem shown in the point box.
 const FACTION = {
@@ -226,20 +233,12 @@ function HeadIcon({ color = 'currentColor', className }) {
   );
 }
 
-// A faction's collected heads shown in a tribe-colored basket with its emblem.
-function BasketPip({ color, count, title, sym }) {
-  const id = 'bg-' + color.replace('#', '');
+// A faction's collected heads shown in its tribe-colored basket (real art) with
+// the running count of heads caught in it.
+function BasketPip({ colorKey, count, title }) {
   return (
     <span className="bpip" title={`${title}: ${count} head${count === 1 ? '' : 's'}`}>
-      <svg className="bpip-svg" viewBox="0 0 30 28" aria-hidden="true">
-        <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={shade(color, 48)} /><stop offset="1" stopColor={shade(color, -46)} />
-        </linearGradient></defs>
-        <path d="M5 10h20l-2.2 13.5a2.2 2.2 0 0 1-2.2 1.9H9.4a2.2 2.2 0 0 1-2.2-1.9z" fill={`url(#${id})`} stroke="rgba(0,0,0,.42)" strokeWidth="0.8" />
-        <ellipse cx="15" cy="10" rx="11" ry="2.6" fill={shade(color, 48)} stroke="rgba(0,0,0,.35)" strokeWidth="0.8" />
-        <path d="M7 15H23M8 19.5H22" stroke="rgba(0,0,0,.16)" strokeWidth="1" />
-      </svg>
-      <span className="bpip-sym">{sym}</span>
+      <img className="bpip-img" src={`/art/basket-${colorKey}.svg`} alt="" />
       <span className="bpip-ct">{count}</span>
     </span>
   );
@@ -280,14 +279,11 @@ function accolades(players) {
   return per;
 }
 
-// Total points shown inside a black severed-head silhouette.
+// Total points shown over the severed-head silhouette (real art).
 function HeadScore({ value }) {
   return (
     <span className="headscore" title={`${value} points`}>
-      <svg className="hs-svg" viewBox="0 0 30 32" aria-hidden="true">
-        <path fill="#141210" stroke="rgba(0,0,0,.5)" strokeWidth="0.5"
-          d="M15 3.4a6 6 0 0 1 6 6c0 2.4-1.3 4.5-3.3 5.6l.6 2.5c3.8.7 6.5 2.8 6.5 5.6V27.4H5.2v-4.3c0-2.8 2.7-4.9 6.5-5.6l.6-2.5A6 6 0 0 1 9 9.4a6 6 0 0 1 6-6z" />
-      </svg>
+      <img className="hs-img" src="/art/head.svg" alt="" />
       <span className="hs-num">{value}</span>
     </span>
   );
@@ -298,6 +294,15 @@ function Board({ game }) {
   const targeting = G.phase === 'targeting';
   const step = game.step();
   const [inspect, setInspect] = useState(null);
+  const inspectT = useRef(null);
+  // Setting an inspect shows the preview at once; clearing it waits a beat so the
+  // pointer can travel to the centered preview and click its Play button.
+  const onInspect = (ins) => {
+    clearTimeout(inspectT.current);
+    if (ins) setInspect(ins);
+    else inspectT.current = setTimeout(() => setInspect(null), 140);
+  };
+  const keepInspect = () => clearTimeout(inspectT.current);
   const [expanded, setExpanded] = useState(null);
   const [fliers, setFliers] = useState([]);
   const [splats, setSplats] = useState([]);
@@ -369,12 +374,13 @@ function Board({ game }) {
         </div>
         {locks.length > 0 && <div className="locks">{locks.map((l, i) => <span key={i} className="lock-chip">{l}</span>)}</div>}
 
-        <GuillotineLine G={G} step={step} onPick={game.pick} onInspect={setInspect} />
+        <GuillotineLine G={G} step={step} onPick={game.pick} onInspect={onInspect} />
 
         <div className="controls">
           {!targeting && (
-            <button className={'btn primary' + (!G.cpu?.[G.current] && G.line.length > 0 ? ' pulse' : '')}
+            <button className={'btn primary behead-btn' + (!G.cpu?.[G.current] && G.line.length > 0 ? ' pulse' : '')}
               onClick={game.collectAndEnd}>
+              {G.line.length > 0 && <img className="behead-blade" src="/art/blade.svg" alt="" />}
               {G.line.length === 0 ? 'End turn →' : 'Off with their head!'}
             </button>
           )}
@@ -382,7 +388,7 @@ function Board({ game }) {
           {game.canUndo() && <button className="btn" onClick={game.undo}>↶ Undo</button>}
         </div>
 
-        <HandDock game={game} onInspect={setInspect} />
+        <HandDock game={game} onInspect={onInspect} />
       </main>
 
       <aside className="hud2">
@@ -395,15 +401,15 @@ function Board({ game }) {
         </div>
         {G.players.map((p, i) => (
           <PlayerCard key={i} player={p} index={i} game={game} step={step}
-            onInspect={setInspect} onExpand={setExpanded} />
+            onInspect={onInspect} onExpand={setExpanded} />
         ))}
         <LogPanel log={G.log} />
       </aside>
 
-      <HoverCard inspect={inspect} />
+      <HoverCard inspect={inspect} onKeep={keepInspect} onClose={() => { clearTimeout(inspectT.current); setInspect(null); }} />
 
       {showPile != null && (
-        <NoblePileModal G={G} index={showPile} game={game} step={step} onInspect={setInspect}
+        <NoblePileModal G={G} index={showPile} game={game} step={step} onInspect={onInspect}
           forced={pileStep === showPile}
           close={() => { if (pileStep === showPile) game.cancelTarget(); setExpanded(null); }} />
       )}
@@ -465,7 +471,7 @@ function PlayerCard({ player, index, game, step, onInspect, onExpand }) {
         </span>
         <span className="pc-tally">
           {colors.length === 0 ? <span className="muted small">no heads</span>
-            : colors.map(c => <BasketPip key={c} color={COLOR_HEX[c]} count={tally[c]} title={FACTION[c].title} sym={FACTION[c].sym} />)}
+            : colors.map(c => <BasketPip key={c} colorKey={c} count={tally[c]} title={FACTION[c].title} />)}
         </span>
       </div>
       {isCurrent && <TurnSteps G={G} />}
@@ -578,6 +584,18 @@ function Guillotine() {
   return (
     <div className="guillo-wrap" title="The guillotine — the next head drops here">
       <svg className="guillo" viewBox="0 0 132 158" aria-label="guillotine">
+        <defs>
+          <linearGradient id="guilloMetal" x1="0" y1="0" x2="1" y2="0.35">
+            <stop offset="0" stopColor="#848484" /><stop offset=".3" stopColor="#dadbdc" />
+            <stop offset=".6" stopColor="#848484" /><stop offset="1" stopColor="#67696a" />
+          </linearGradient>
+          <linearGradient id="guilloEdge" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#bababa" /><stop offset=".3" stopColor="#fff" /><stop offset="1" stopColor="#929394" />
+          </linearGradient>
+          <radialGradient id="guilloRivet" cx=".35" cy=".3" r=".75">
+            <stop offset="0" stopColor="#fffcdf" /><stop offset=".3" stopColor="#d8bb12" /><stop offset="1" stopColor="#332d04" />
+          </radialGradient>
+        </defs>
         {/* stairs leading up from the line (left) */}
         <rect x="2" y="140" width="18" height="7" fill="#5a4330" stroke="#3f2f22" strokeWidth="0.8" />
         <rect x="8" y="133" width="18" height="7" fill="#654b36" stroke="#3f2f22" strokeWidth="0.8" />
@@ -594,11 +612,17 @@ function Guillotine() {
         {/* top crossbeam */}
         <rect x="44" y="6" width="61" height="13" rx="2" fill="#4f3a26" stroke="#2c2015" strokeWidth="1" />
         {/* rope */}
-        <line x1="74" y1="19" x2="74" y2="30" stroke="#caa66a" strokeWidth="1.6" />
-        {/* mouton + angled blade */}
-        <rect x="56" y="30" width="38" height="15" fill="#8d9398" stroke="#5c6165" strokeWidth="1" />
-        <polygon points="56,45 94,45 94,61 56,47" fill="#d7dbde" stroke="#a9aeb1" strokeWidth="1" />
-        <polygon points="56,45 94,45 90,49 56,47" fill="#eef1f3" opacity=".7" />
+        <line x1="74" y1="18" x2="74" y2="28" stroke="#caa66a" strokeWidth="1.6" />
+        {/* angled blade (metallic) */}
+        <polygon points="52,44 97,44 97,60 52,66" fill="url(#guilloMetal)" stroke="#5c6165" strokeWidth="0.6" />
+        <polygon points="52,60 97,55 97,60 52,66" fill="url(#guilloEdge)" opacity=".85" />
+        {/* wooden stock (mouton) with gold rivets */}
+        <rect x="47" y="28" width="54" height="17" rx="2" fill="#774c00" stroke="#3f2f22" strokeWidth="0.8" />
+        <rect x="50" y="30" width="48" height="13" rx="1.5" fill="#4c3612" />
+        <circle cx="58" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
+        <circle cx="70" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
+        <circle cx="82" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
+        <circle cx="94" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
         {/* lunette — the neck hole */}
         <circle cx="74.5" cy="96" r="12" fill="#17110c" />
         <path d="M63 96a11.5 11.5 0 0 1 23 0" fill="none" stroke="#c6a765" strokeWidth="3" />
@@ -627,7 +651,8 @@ function HandDock({ game, onInspect }) {
           <button key={inst.uid} className={'dock-card' + (playable ? ' playable' : '')}
             style={{ '--i': hi - (n - 1) / 2 }}
             onClick={() => playable && game.playCard(hi)}
-            onMouseEnter={(e) => onInspect(actionInspect(def, e.currentTarget))} onMouseLeave={() => onInspect(null)}
+            onMouseEnter={(e) => onInspect({ ...actionInspect(def, e.currentTarget), onPlay: playable ? () => game.playCard(hi) : null })}
+            onMouseLeave={() => onInspect(null)}
             title={`${def.name}\n${def.text}`}>
             <img src={actionImg(def.id)} alt={def.name} />
           </button>
@@ -671,15 +696,22 @@ function NoblePileModal({ G, index, game, step, onInspect, forced, close }) {
 
 // A big preview in one consistent spot (screen center) so the eye always knows
 // where to look — never jumping around the hovered card.
-function HoverCard({ inspect }) {
+function HoverCard({ inspect, onKeep, onClose }) {
   if (!inspect) return null;
-  const { img, name, sub, text, color } = inspect;
+  const { img, name, faction, factionName, text, color, onPlay } = inspect;
   return (
-    <div className="hovercard center">
-      <img className="hc-img" src={img} alt={name} style={{ borderColor: color }} />
+    <div className="hovercard center" onMouseEnter={onKeep} onMouseLeave={onClose}>
+      <div className="hc-imgwrap">
+        <img className="hc-img" src={img} alt={name} style={{ borderColor: color }} />
+        {faction && <img className="hc-emblem" src={`/art/symbol-${faction}.svg`} alt={factionName} title={factionName} />}
+      </div>
       <div className="hc-name">{name}</div>
-      <div className="hc-sub" style={{ color }}>{sub}</div>
       {text && <div className="hc-text">{text}</div>}
+      {onPlay && (
+        <button className="btn primary hc-play" onClick={() => { onPlay(); onClose && onClose(); }}>
+          Play this card ▸
+        </button>
+      )}
     </div>
   );
 }

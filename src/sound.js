@@ -1,6 +1,8 @@
 // Lightweight SFX: a blade slice then a gore/splatter hit on each beheading.
 const SLICE = ['/sfx/slice1.mp3', '/sfx/slice2.mp3', '/sfx/slice3.mp3'];
 const GORE = ['/sfx/gore-axe.mp3', '/sfx/gore-rip.mp3', '/sfx/gore-splat.mp3', '/sfx/behead1.mp3', '/sfx/behead2.mp3'];
+const BELL = '/sfx/bell.mp3';        // solemn toll — rounds ending / game over
+const ROOSTER = '/sfx/rooster.mp3';  // dawn — a new day begins
 
 let muted = false;
 try { muted = localStorage.getItem('guillotine-muted') === '1'; } catch { /* ignore */ }
@@ -14,7 +16,18 @@ export function toggleMuted() {
 
 // Preload one element per clip (cloned per play so sounds can overlap).
 const cache = {};
-[...SLICE, ...GORE].forEach(src => { const a = new Audio(src); a.preload = 'auto'; cache[src] = a; });
+[...SLICE, ...GORE, BELL, ROOSTER].forEach(src => { const a = new Audio(src); a.preload = 'auto'; cache[src] = a; });
+
+function playOne(src, volume) {
+  if (muted) return;
+  try {
+    const a = cache[src] ? cache[src].cloneNode() : new Audio(src);
+    a.volume = volume;
+    a.play().catch(() => {});
+  } catch { /* ignore */ }
+}
+export function playBell(volume = 0.6) { playOne(BELL, volume); }
+export function playRooster(volume = 0.7) { playOne(ROOSTER, volume); }
 
 function play(pool, volume) {
   if (muted) return;
@@ -63,7 +76,7 @@ export function playWhoosh() {
 // Unlock autoplay on the first user gesture (iOS/Chrome policy).
 if (typeof window !== 'undefined') {
   const unlock = () => {
-    [...SLICE, ...GORE].forEach(src => {
+    [...SLICE, ...GORE, BELL, ROOSTER].forEach(src => {
       const a = cache[src];
       if (!a) return;
       a.muted = true;
