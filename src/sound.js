@@ -33,6 +33,33 @@ export function playBehead() {
   setTimeout(() => play(GORE, 0.85), 110);
 }
 
+// A synthesized card "whoosh" (filtered noise sweep) when a card is played.
+let _ac;
+function actx() {
+  if (!_ac) { const A = window.AudioContext || window.webkitAudioContext; if (A) _ac = new A(); }
+  return _ac;
+}
+export function playWhoosh() {
+  if (muted) return;
+  try {
+    const ctx = actx(); if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    const dur = 0.22, t = ctx.currentTime;
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 0.9;
+    bp.frequency.setValueAtTime(380, t); bp.frequency.exponentialRampToValueAtTime(2400, t + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.22, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(bp).connect(g).connect(ctx.destination);
+    src.start(t); src.stop(t + dur);
+  } catch { /* ignore */ }
+}
+
 // Unlock autoplay on the first user gesture (iOS/Chrome policy).
 if (typeof window !== 'undefined') {
   const unlock = () => {

@@ -8,7 +8,7 @@ import {
 import { computeScore } from './utils/scoring';
 import { judgeBlocks, callousActive } from './utils/effects';
 import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner } from './Effects';
-import { playBehead, isMuted, toggleMuted } from './sound';
+import { playBehead, playWhoosh, isMuted, toggleMuted } from './sound';
 
 // ─── Themes: color palettes + font sets (chosen in the Theme sheet) ─────────
 const PALETTES = {
@@ -76,10 +76,16 @@ export default function App() {
   const { G } = game;
   const [theme, setThemeState] = useState(loadTheme);
   const [showTheme, setShowTheme] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [speed, setSpeed] = useState(() => { try { return Number(localStorage.getItem('guillotine-speed')) || 1; } catch { return 1; } });
   const setTheme = (patch) => {
     const nt = { ...theme, ...patch };
     setThemeState(nt); applyTheme(nt);
     try { localStorage.setItem(THEME_KEY, JSON.stringify(nt)); } catch { /* ignore */ }
+  };
+  const toggleSpeed = () => {
+    const s = speed >= 2 ? 1 : 2;
+    setSpeed(s); try { localStorage.setItem('guillotine-speed', String(s)); } catch { /* ignore */ }
   };
 
   // No handoff screen for now — advance straight into the next turn.
@@ -93,9 +99,9 @@ export default function App() {
   // Drive computer players in two beats: play a card, then (after a pause) behead.
   useEffect(() => {
     if (G.phase !== 'playing' || !G.cpu?.[G.current]) return;
-    const t = setTimeout(() => { if (G.actionPlayed) game.collectAndEnd(); else game.cpuPlay(); }, 900);
+    const t = setTimeout(() => { if (G.actionPlayed) game.collectAndEnd(); else game.cpuPlay(); }, Math.round(900 / speed));
     return () => clearTimeout(t);
-  }, [G.phase, G.current, G.day, G.actionPlayed]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [G.phase, G.current, G.day, G.actionPlayed, speed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'bugs')
     return <div className="app"><BugViewer /></div>;
@@ -105,10 +111,13 @@ export default function App() {
       <header className="topbar">
         <img className="topbar-logo" src="/logo.jpg" alt="Guillotine" />
         <span className="tagline">win by getting a head</span>
+        <button className="nav-btn" onClick={() => setShowHelp(true)} title="How to play">?</button>
+        <button className="nav-btn" onClick={toggleSpeed} title="CPU speed">{speed}×</button>
         <button className="nav-btn theme-btn" onClick={() => setShowTheme(true)} title="Theme &amp; fonts">🎨</button>
         <MusicPlayer />
       </header>
       {showTheme && <ThemeSheet theme={theme} setTheme={setTheme} close={() => setShowTheme(false)} />}
+      {showHelp && <HelpSheet close={() => setShowHelp(false)} />}
       {G.phase === 'start' && <StartScreen onStart={game.start} />}
       {G.phase === 'gameOver' && <GameOver G={G} onRestart={game.restart} />}
       {(G.phase === 'playing' || G.phase === 'targeting' || G.phase === 'pass') && <Board game={game} />}
@@ -299,6 +308,7 @@ function Board({ game }) {
       if (e.kind === 'play' && e.defId) {
         const def = ACTION_BY_ID[e.defId];
         lastPlay = { key: e.id, who: G.players[e.playerIdx]?.name, name: def.name, text: def.text };
+        playWhoosh();
         continue;
       }
       if (e.kind !== 'collect') continue;
@@ -738,6 +748,32 @@ function LogPanel({ log }) {
         {recent.map((entry, i) => (
           <div key={entry.id} className={'log-line' + (i === 0 ? ' newest' : '')}>{entry.text}</div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function HelpSheet({ close }) {
+  return (
+    <div className="modal-backdrop" onClick={close}>
+      <div className="modal help-sheet" onClick={e => e.stopPropagation()}>
+        <p className="modal-title">How to play</p>
+        <div className="help-body">
+          <p><b>Goal.</b> Collect the most valuable heads over <b>3 days</b>. Each noble's points are the number in its basket (lower-right).</p>
+          <p><b>Your turn, in order:</b></p>
+          <ol>
+            <li><b>Play an action card</b> (optional) — rearrange the line, add/remove nobles, or target opponents.</li>
+            <li><b>Behead the front noble</b> (the one by the guillotine) into your score pile.</li>
+            <li><b>Draw</b> a new action card.</li>
+          </ol>
+          <p>The day ends when the line is empty; a fresh 12 nobles come out. After day 3, most points wins.</p>
+          <p className="help-factions"><b>Factions (noble colours):</b></p>
+          <div className="help-legend">
+            <span>✝ Clergy</span><span>⚖ Judiciary</span><span>⚒ Common folk</span><span>⚔ Military</span><span>♛ Royalty</span>
+          </div>
+          <p className="muted small">Watch for combos: Count + Countess, stacking Palace Guards, and negative "good-guy" nobles (Hero, Tragic Figure). Hover any card to see it big.</p>
+        </div>
+        <button className="btn primary" onClick={close}>Got it</button>
       </div>
     </div>
   );
