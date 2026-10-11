@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import './App.css';
 import { useGame } from './hooks/useGame';
 import {
@@ -7,10 +7,21 @@ import {
 } from './data/cards';
 import { computeScore } from './utils/scoring';
 import { judgeBlocks, callousActive } from './utils/effects';
+import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner } from './Effects';
 
 export default function App() {
   const game = useGame();
   const { G } = game;
+
+  // No handoff screen for now — advance straight into the next turn (keeps the
+  // board mounted across turns so the day banner doesn't replay each turn).
+  useEffect(() => {
+    if (G.phase === 'pass') {
+      const t = setTimeout(() => game.advanceFromPass(), 0);
+      return () => clearTimeout(t);
+    }
+  }, [G.phase, G.current, G.day]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="app">
       <header className="topbar">
@@ -18,9 +29,8 @@ export default function App() {
         <span className="tagline">win by getting a head</span>
       </header>
       {G.phase === 'start' && <StartScreen onStart={game.start} />}
-      {G.phase === 'pass' && <PassScreen G={G} onContinue={game.advanceFromPass} />}
       {G.phase === 'gameOver' && <GameOver G={G} onRestart={game.restart} />}
-      {(G.phase === 'playing' || G.phase === 'targeting') && <Board game={game} />}
+      {(G.phase === 'playing' || G.phase === 'targeting' || G.phase === 'pass') && <Board game={game} />}
     </div>
   );
 }
@@ -82,6 +92,44 @@ function Board({ game }) {
   const targeting = G.phase === 'targeting';
   const step = game.step();
   const [inspect, setInspect] = useState(null);
+  const [fliers, setFliers] = useState([]);
+  const [splats, setSplats] = useState([]);
+  const seen = useRef(0);
+  const lineRects = useRef({});
+
+  // Diff new log entries → spawn a slice + blood splatter for each beheading.
+  // Declared BEFORE the capture effect so it reads the PREVIOUS render's rects
+  // (the collected card is already gone from the DOM this render).
+  useLayoutEffect(() => {
+    const fresh = G.log.filter(l => l.id > seen.current);
+    if (!fresh.length) return;
+    seen.current = Math.max(seen.current, ...fresh.map(l => l.id));
+    const newFliers = [], newSplats = [];
+    for (const e of fresh) {
+      if (e.kind !== 'collect') continue;
+      const from = lineRects.current[String(e.uid)];
+      const pile = document.querySelector(`[data-pile="${e.playerIdx}"]`);
+      if (!from || !pile) continue;
+      const p = pile.getBoundingClientRect();
+      const fromPt = { x: from.left + from.width / 2, y: from.top + from.height / 2 };
+      newFliers.push({ key: e.id, uid: e.uid, defId: e.defId, from: fromPt,
+        to: { x: p.left + 28, y: p.top + 34 } });
+      newSplats.push({ key: e.id, x: fromPt.x + (Math.random() * 120 - 60),
+        y: fromPt.y + (Math.random() * 90 - 30), scale: 0.9 + Math.random() * 0.7 });
+    }
+    if (newFliers.length) setFliers(f => [...f, ...newFliers]);
+    if (newSplats.length) setSplats(s => [...s, ...newSplats]);
+  });
+
+  // Capture current line-card screen positions every render.
+  useLayoutEffect(() => {
+    const map = {};
+    document.querySelectorAll('.noble-card[data-line-uid]').forEach(el => {
+      map[el.getAttribute('data-line-uid')] = el.getBoundingClientRect();
+    });
+    lineRects.current = map;
+  });
+
   const locks = [];
   if (judgeBlocks(G)) locks.push('⚖ Unpopular Judge at the front — no action cards this turn.');
   else {
@@ -137,20 +185,48 @@ function Board({ game }) {
             return { key: inst.uid, img: actionImg(def.id), name: def.name,
               onClick: () => game.pick({ idx }) };
           })} />}
+
+      <div className="fx-layer">
+        {splats.map(s => <BloodSplatter key={s.key} splat={s}
+          onDone={() => setSplats(x => x.filter(y => y.key !== s.key))} />)}
+        {fliers.map(f => <SliceFlier key={f.key} flier={f}
+          onDone={() => setFliers(x => x.filter(y => y.key !== f.key))} />)}
+      </div>
+      <DayBanner day={G.day} />
     </div>
   );
 }
 
 function LineArea({ G, step, onPick, onInspect }) {
   const scrollRef = useRef(null);
+  const cardEls = useRef(new Map());
+  const prevOffsets = useRef(new Map());
   const reorder = step && step.type === 'reorder';
   const lineTarget = step && (step.type === 'lineNoble' || step.type === 'reorder');
   const order = reorder ? G.pending.order : [];
   // back of line on the left, front (next to collect) on the right by the guillotine
   const display = G.line.map((inst, idx) => ({ inst, idx })).reverse();
 
-  // Keep the front of the line (and guillotine) in view.
+  // FLIP: animate cards sliding to their new slots when the line reorders.
+  useLayoutEffect(() => {
+    const next = new Map();
+    cardEls.current.forEach((el, uid) => { if (el) next.set(uid, { l: el.offsetLeft, t: el.offsetTop }); });
+    next.forEach((pos, uid) => {
+      const prev = prevOffsets.current.get(uid);
+      const el = cardEls.current.get(uid);
+      if (!prev || !el) return;
+      const dx = prev.l - pos.l, dy = prev.t - pos.t;
+      if (dx || dy) el.animate(
+        [{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'translate(0,0)' }],
+        { duration: 340, easing: 'cubic-bezier(.45,0,.35,1)' });
+    });
+    prevOffsets.current = next;
+  }, [G.line]);
+
+  // Keep the front of the line in view — but not while targeting (a candidate
+  // near the back must stay reachable; don't yank the scroll out from under it).
   useEffect(() => {
+    if (G.phase === 'targeting') return;
     const el = scrollRef.current;
     if (el) el.scrollLeft = el.scrollWidth;
   }, [G.line.length, G.phase]);
@@ -165,6 +241,8 @@ function LineArea({ G, step, onPick, onInspect }) {
           const ordPos = order.indexOf(idx);
           return (
             <button key={inst.uid}
+              ref={el => { if (el) cardEls.current.set(inst.uid, el); else cardEls.current.delete(inst.uid); }}
+              data-line-uid={inst.uid}
               className={'noble-card' + (idx === 0 ? ' front' : '') + (isCand && ordPos < 0 ? ' candidate' : '')}
               style={{ borderColor: COLOR_HEX[def.color] }}
               onClick={() => isCand && ordPos < 0 && onPick({ idx })}
@@ -204,6 +282,7 @@ function PlayerPanel({ player, index, game, step, onInspect }) {
       <div className="panel-head">
         <span className="pname">{player.name}{isCurrent ? ' ◄' : ''}</span>
         <span className="pscore" onClick={(e) => { e.stopPropagation(); setShowBreakdown(v => !v); }}>
+          <ScoreDelta value={total} />
           {total} pts ▾
           {showBreakdown && (
             <div className="breakdown" onClick={e => e.stopPropagation()}>
@@ -217,15 +296,14 @@ function PlayerPanel({ player, index, game, step, onInspect }) {
         </span>
       </div>
 
-      <div className="pile">
+      <div className="pile" data-pile={index}>
         {player.scorePile.length === 0 && <span className="muted small">no heads yet</span>}
         {player.scorePile.map((inst, pi) => {
           const def = NOBLE_BY_ID[inst.defId];
           const clickable = pileTarget && step.candidates.includes(pi);
-          return <img key={inst.uid}
+          return <SlicedThumb key={inst.uid} defId={inst.defId} uid={inst.uid}
             className={'thumb noble' + (clickable ? ' clickable' : '')}
-            style={{ borderColor: COLOR_HEX[def.color] }}
-            src={nobleImg(def.id)} alt={def.name} title={`${def.name} (${COLORS[def.color]})`}
+            title={`${def.name} (${COLORS[def.color]})`}
             onMouseEnter={() => onInspect(nobleInspect(def))} onMouseLeave={() => onInspect(null)}
             onClick={clickable ? (e) => { e.stopPropagation(); game.pick({ idx: pi }); } : undefined} />;
         })}
@@ -312,8 +390,8 @@ function LogPanel({ log }) {
       <div className="log-head">Game Log</div>
       <div className="log-body">
         {recent.length === 0 && <div className="muted small">No moves yet.</div>}
-        {recent.map((line, i) => (
-          <div key={log.length - i} className={'log-line' + (i === 0 ? ' newest' : '')}>{line}</div>
+        {recent.map((entry, i) => (
+          <div key={entry.id} className={'log-line' + (i === 0 ? ' newest' : '')}>{entry.text}</div>
         ))}
       </div>
     </div>

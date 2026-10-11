@@ -1,0 +1,149 @@
+import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
+import { NOBLE_BY_ID, COLOR_HEX, nobleImg } from './data/cards';
+
+export const REDUCE = typeof matchMedia !== 'undefined'
+  && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// deterministic pseudo-random in [0,1) from an integer — so a card's slice
+// angle is the same in flight and in the score pile, and stable across renders.
+function rng(seed) { const x = Math.sin((seed + 1) * 999.73) * 10000; return x - Math.floor(x); }
+
+export function sliceParams(uid) {
+  return {
+    tilt: (rng(uid) * 2 - 1) * 24,      // cut tilt, % of card height (varies the angle)
+    rot:  (rng(uid + 7) * 2 - 1) * 7,   // jaunty rotation in the pile (deg)
+    gap:  2 + rng(uid + 13) * 3,        // half-separation in the pile (px)
+  };
+}
+
+// clip-path polygons for the two halves of a horizontal-ish cut.
+function clips(tilt) {
+  const top = 50 - tilt, bot = 50 + tilt;
+  return {
+    top: `polygon(0 0, 100% 0, 100% ${top}%, 0 ${bot}%)`,
+    bottom: `polygon(0 ${bot}%, 100% ${top}%, 100% 100%, 0 100%)`,
+  };
+}
+
+const CARD_W = 124, CARD_H = 178;
+
+// A beheaded noble: splits along a varied diagonal, the halves kick apart, then
+// tumble into the score pile. Positions are viewport coords.
+export function SliceFlier({ flier, onDone }) {
+  const topRef = useRef(null), botRef = useRef(null), slashRef = useRef(null);
+  const { from, to, defId, uid } = flier;
+  const def = NOBLE_BY_ID[defId];
+  const p = sliceParams(uid);
+  const c = clips(p.tilt);
+  const cutDeg = Math.atan2(-(2 * p.tilt / 100) * CARD_H, CARD_W) * 180 / Math.PI;
+
+  useLayoutEffect(() => {
+    const dx = to.x - from.x, dy = to.y - from.y;
+    const sx = 8 + rng(uid + 3) * 8, sy = 16 + rng(uid + 5) * 10;
+    const dur = REDUCE ? 1 : 720;
+    const opt = { duration: dur, easing: 'cubic-bezier(.35,.1,.25,1)', fill: 'forwards' };
+    const aTop = topRef.current.animate([
+      { transform: 'translate(0,0) rotate(0) scale(1)', opacity: 1 },
+      { transform: `translate(${-sx}px,${-sy}px) rotate(${-4 - p.rot}deg)`, opacity: 1, offset: .18 },
+      { transform: `translate(${dx}px,${dy}px) rotate(${p.rot * 2}deg) scale(.34)`, opacity: .2 },
+    ], opt);
+    botRef.current.animate([
+      { transform: 'translate(0,0) rotate(0) scale(1)', opacity: 1 },
+      { transform: `translate(${sx}px,${sy}px) rotate(${4 + p.rot}deg)`, opacity: 1, offset: .18 },
+      { transform: `translate(${dx}px,${dy + 6}px) rotate(${-p.rot * 2}deg) scale(.34)`, opacity: .2 },
+    ], opt);
+    if (slashRef.current && !REDUCE) {
+      slashRef.current.animate([
+        { transform: 'scaleX(0)', opacity: 0 },
+        { transform: 'scaleX(1.1)', opacity: 1, offset: .1 },
+        { transform: 'scaleX(1.1)', opacity: 0, offset: .28 },
+        { opacity: 0 },
+      ], { duration: dur, easing: 'ease-out', fill: 'forwards' });
+    }
+    aTop.onfinish = onDone;
+    return () => aTop.cancel();
+  }, []);
+
+  return (
+    <div className="slice-flier" style={{ left: from.x - CARD_W / 2, top: from.y - CARD_H / 2 }}>
+      <img ref={topRef} className="slice-half" src={nobleImg(def.id)} alt=""
+        style={{ clipPath: c.top, borderColor: COLOR_HEX[def.color] }} />
+      <img ref={botRef} className="slice-half" src={nobleImg(def.id)} alt=""
+        style={{ clipPath: c.bottom, borderColor: COLOR_HEX[def.color] }} />
+      <div className="slash-wrap" style={{ transform: `rotate(${cutDeg}deg)` }}>
+        <div ref={slashRef} className="slash" />
+      </div>
+    </div>
+  );
+}
+
+// A burst of blood on the "camera" — varied each time.
+export function BloodSplatter({ splat, onDone }) {
+  const ref = useRef(null);
+  const blobs = useMemo(() => {
+    const s = splat.key, arr = [];
+    const main = 4 + Math.floor(rng(s) * 4);
+    for (let i = 0; i < main; i++)
+      arr.push({ cx: 60 + (rng(s + i) * 2 - 1) * 55, cy: 60 + (rng(s + i * 3) * 2 - 1) * 55, r: 8 + rng(s + i * 7) * 24 });
+    const drops = 12 + Math.floor(rng(s + 99) * 16);
+    for (let i = 0; i < drops; i++)
+      arr.push({ cx: 60 + (rng(s + i * 11) * 2 - 1) * 110, cy: 60 + (rng(s + i * 13) * 2 - 1) * 110, r: 1 + rng(s + i * 17) * 4.5 });
+    return arr;
+  }, [splat.key]);
+
+  useLayoutEffect(() => {
+    if (REDUCE) { onDone(); return; }
+    const a = ref.current.animate([
+      { opacity: 0, transform: 'scale(.7)' },
+      { opacity: .9, transform: 'scale(1.05)', offset: .12 },
+      { opacity: .8, transform: 'scale(1)', offset: .45 },
+      { opacity: 0, transform: 'scale(1)' },
+    ], { duration: 820, easing: 'ease-out', fill: 'forwards' });
+    a.onfinish = onDone;
+    return () => a.cancel();
+  }, []);
+
+  const rot = (rng(splat.key + 1) * 2 - 1) * 45;
+  return (
+    <div className="blood-wrap" style={{ left: splat.x, top: splat.y, transform: `translate(-50%,-50%) rotate(${rot}deg) scale(${splat.scale})` }}>
+      <svg ref={ref} className="blood" viewBox="0 0 120 120">
+        {blobs.map((b, i) => <circle key={i} cx={b.cx} cy={b.cy} r={b.r} />)}
+      </svg>
+    </div>
+  );
+}
+
+// A collected noble shown as two jaunty halves — but it's still one card.
+export function SlicedThumb({ defId, uid, className = '', title, onClick, onMouseEnter, onMouseLeave }) {
+  const def = NOBLE_BY_ID[defId];
+  const p = sliceParams(uid);
+  const c = clips(p.tilt);
+  const border = COLOR_HEX[def.color];
+  return (
+    <span className={'sliced-thumb ' + className} title={title}
+      onClick={onClick} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}
+      style={{ '--rot': p.rot + 'deg', '--gap': p.gap + 'px' }}>
+      <img className="st-half top" src={nobleImg(def.id)} alt={def.name} style={{ clipPath: c.top, borderColor: border }} />
+      <img className="st-half bot" src={nobleImg(def.id)} alt="" style={{ clipPath: c.bottom, borderColor: border }} />
+    </span>
+  );
+}
+
+// Floats a +N / −N off a number when it changes.
+export function ScoreDelta({ value }) {
+  const prev = useRef(value);
+  const [d, setD] = useState(null);
+  useEffect(() => {
+    const diff = value - prev.current;
+    prev.current = value;
+    if (diff !== 0) setD({ diff, key: Date.now() });
+  }, [value]);
+  if (!d) return null;
+  return <span key={d.key} className={'score-delta ' + (d.diff > 0 ? 'up' : 'down')}>
+    {d.diff > 0 ? `+${d.diff}` : d.diff}
+  </span>;
+}
+
+export function DayBanner({ day }) {
+  return <div className="day-banner" key={day}>Day {day}</div>;
+}

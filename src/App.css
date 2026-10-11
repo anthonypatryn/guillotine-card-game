@@ -299,3 +299,74 @@
   .board { flex-direction: column; }
   .inspector { display: none; }
 }
+
+/* ─── Slice / blood / pile halves / deltas (animation pass) ─── */
+:root {
+  --dur-fast: 180ms; --dur: 320ms;
+  --ease-spring: cubic-bezier(.2,1.6,.4,1);
+  --ease-slide: cubic-bezier(.45,0,.35,1);
+}
+
+.fx-layer { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+
+.slice-flier { position: fixed; width: 124px; height: 178px; pointer-events: none; }
+.slice-half {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  border: 3px solid #555; border-radius: 6px; will-change: transform; backface-visibility: hidden;
+}
+.slash-wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.slash {
+  width: 160%; height: 5px; transform-origin: center;
+  background: linear-gradient(90deg, transparent, #fff 35%, #ffe3e3 50%, #fff 65%, transparent);
+  box-shadow: 0 0 12px #fff, 0 0 4px #fff;
+}
+
+.blood-wrap { position: fixed; width: 340px; height: 340px; pointer-events: none; }
+.blood { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+.blood circle { fill: #7d0b0b; }
+
+/* collected noble shown as two jaunty halves — one logical card */
+.sliced-thumb {
+  position: relative; display: inline-block; width: 50px; height: 72px;
+  border: none !important; background: none; overflow: visible;
+}
+.st-half {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  border: 2px solid #555; border-radius: 3px;
+}
+.st-half.top { transform: translate(calc(var(--gap) * -0.5), calc(var(--gap) * -0.7)) rotate(calc(-1 * var(--rot))); }
+.st-half.bot { transform: translate(calc(var(--gap) * 0.5), calc(var(--gap) * 0.7)) rotate(var(--rot)); }
+.sliced-thumb.clickable { outline: 2px solid var(--accent-bright); outline-offset: 1px; cursor: pointer; }
+.sliced-thumb:hover { filter: brightness(1.1); }
+
+.score-delta {
+  position: absolute; right: 100%; margin-right: 8px; top: 2px; white-space: nowrap;
+  font-weight: bold; font-size: 15px; pointer-events: none; animation: floatUp 1s ease forwards;
+}
+.score-delta.up { color: #8fe86a; }
+.score-delta.down { color: var(--accent-bright); }
+@keyframes floatUp {
+  0% { opacity: 0; transform: translateY(8px); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-22px); }
+}
+
+.day-banner {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  pointer-events: none; z-index: 55;
+  font-family: Georgia, 'Times New Roman', serif; font-size: 64px; font-weight: bold;
+  color: var(--gold); text-shadow: 0 3px 16px rgba(0,0,0,.85);
+  animation: dayIn 1.7s ease forwards;
+}
+@keyframes dayIn {
+  0% { opacity: 0; transform: scale(.7); }
+  14% { opacity: 1; transform: scale(1.06); }
+  28% { transform: scale(1); }
+  72% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .day-banner { display: none; }
+  .noble-card:hover, .hand-card:hover { transform: none; }
+}
