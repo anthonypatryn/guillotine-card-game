@@ -121,6 +121,7 @@ export default function App() {
   const view = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('view') : null;
   if (view === 'bugs') return <div className="app"><BugViewer /></div>;
   if (view === 'art') return <div className="app"><ArtReview /></div>;
+  if (view === 'cardedit') return <div className="app"><CardEdit /></div>;
 
   return (
     <div className="app">
@@ -988,6 +989,77 @@ function HelpSheet({ close, reduce, setReduce }) {
         </div>
         <button className="btn primary" onClick={close}>Got it</button>
       </div>
+    </div>
+  );
+}
+
+// ─── Number-placement editor (/?view=cardedit) ───────────────────────────────
+// Drag to move, scroll to scale. Values (as % of the art box) persist to
+// localStorage so the exact placement can be baked into the CSS.
+const NUMPOS_KEY = 'guillotine-numpos';
+const NUMPOS_DEFAULTS = {
+  head:   { x: 50, y: 37, f: 40 },   // f = font size as % of box height
+  basket: { x: 50, y: 24, f: 33 },
+  hand:   { x: 50, y: 50, f: 38 },
+};
+function DragNum({ value, pos, setPos, boxH, dark }) {
+  const onDown = (e) => {
+    e.preventDefault();
+    const parent = e.currentTarget.parentElement.getBoundingClientRect();
+    const move = (ev) => {
+      const x = Math.max(0, Math.min(100, ((ev.clientX - parent.left) / parent.width) * 100));
+      const y = Math.max(0, Math.min(100, ((ev.clientY - parent.top) / parent.height) * 100));
+      setPos(p => ({ ...p, x: +x.toFixed(1), y: +y.toFixed(1) }));
+    };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+  const onWheel = (e) => { e.preventDefault(); setPos(p => ({ ...p, f: +Math.max(6, Math.min(90, p.f + (e.deltaY < 0 ? 1 : -1))).toFixed(0) })); };
+  return (
+    <span className={'edit-num' + (dark ? ' dark' : '')}
+      style={{ left: pos.x + '%', top: pos.y + '%', fontSize: (pos.f / 100 * boxH) + 'px' }}
+      onPointerDown={onDown} onWheel={onWheel}>{value}</span>
+  );
+}
+const HandStackArt = () => (
+  <svg className="ce-img" viewBox="0 0 40 46" aria-hidden="true">
+    <rect x="5" y="9" width="24" height="33" rx="3" fill="#e7e1d3" stroke="#7d7566" strokeWidth="1" transform="rotate(-10 17 25)" />
+    <rect x="11" y="8" width="24" height="33" rx="3" fill="#f2ece0" stroke="#7d7566" strokeWidth="1" transform="rotate(7 23 24)" />
+    <rect x="8" y="6" width="24" height="33" rx="3" fill="#fff" stroke="#7d7566" strokeWidth="1" />
+  </svg>
+);
+function CardEdit() {
+  const [pos, setPos] = useState(() => {
+    try { return { ...NUMPOS_DEFAULTS, ...(JSON.parse(localStorage.getItem(NUMPOS_KEY)) || {}) }; } catch { return NUMPOS_DEFAULTS; }
+  });
+  useEffect(() => { try { localStorage.setItem(NUMPOS_KEY, JSON.stringify(pos)); } catch { /* ignore */ } }, [pos]);
+  const set = (key) => (fn) => setPos(p => ({ ...p, [key]: fn(p[key]) }));
+  const HH = 230, BH = 210, NH = 196;   // editor box heights
+  const slot = (label, key, art, boxH, dark) => (
+    <div className="ce-slot">
+      <div className="ce-box" style={{ height: boxH, width: boxH * 0.84 }}>
+        {art}
+        <DragNum value={key === 'head' ? '22' : key === 'basket' ? '4' : '5'} pos={pos[key]} setPos={set(key)} boxH={boxH} dark={dark} />
+      </div>
+      <div className="ce-label">{label}</div>
+      <div className="ce-vals">x {pos[key].x}% · y {pos[key].y}% · size {pos[key].f}%</div>
+    </div>
+  );
+  return (
+    <div className="card-edit">
+      <h1>Number placement</h1>
+      <p className="muted"><b>Drag</b> each number to move · <b>scroll</b> over it to scale. Then tell me &ldquo;done&rdquo; and I&rsquo;ll bake these in exactly. (Baskets all share one position.)</p>
+      <div className="ce-grid">
+        {slot('Head · points', 'head', <img className="ce-img" src="/art/head-gold.svg" alt="" />, HH, true)}
+        {slot('Basket · count', 'basket', <img className="ce-img" src="/art/basket-purple.svg" alt="" />, BH, false)}
+        {slot('Hand · count', 'hand', <HandStackArt />, NH, true)}
+      </div>
+      <pre className="ce-readout">{JSON.stringify(pos)}</pre>
+      <div className="ce-btns">
+        <button className="btn primary" onClick={() => { try { navigator.clipboard.writeText(JSON.stringify(pos)); } catch { /* ignore */ } }}>Copy values</button>
+        <button className="btn" onClick={() => setPos(NUMPOS_DEFAULTS)}>Reset</button>
+      </div>
+      <p className="muted small" style={{ marginTop: 10 }}>Paste the copied line back to me and I&rsquo;ll apply it exactly.</p>
     </div>
   );
 }

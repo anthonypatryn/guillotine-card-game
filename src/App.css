@@ -1149,3 +1149,31 @@
 /* center the points in the head; basket counts sit up in the handle, not on the icon */
 .hs-num, .pc-top .headscore .hs-num, .go-score .hs-num, .notice-score .hs-num { top: 50%; transform: translateY(-50%); }
 .bpip-ct { top: 13%; bottom: auto; }
+/* the head's solid hair-blob sits in the TOP ~55% (wispy strands pad the box
+   below), so centre the points in the blob, not the geometric box */
+.pc-top .headscore .hs-num, .go-score .hs-num, .notice-score .hs-num { top: 37%; }
+.pc-top .headscore .hs-num { font-size: 20px; }
+/* centre the basket count inside the handle loop */
+.bpip-ct { top: 24%; transform: translateY(-50%); }
+.pc-baskets .bpip-ct { font-size: 15px; }
+.hand-stack-ct { font-size: 16px; }
+
+/* ===== number placement editor (/?view=cardedit) ===== */
+.card-edit { max-width: 900px; margin: 0 auto; padding: 24px 18px 60px; text-align: center; }
+.card-edit h1 { font-family: var(--font-display); color: var(--accent-bright); font-size: 30px; margin: 0 0 4px; }
+.card-edit > p { max-width: 640px; margin: 6px auto 22px; }
+.ce-grid { display: flex; flex-wrap: wrap; gap: 32px; justify-content: center; align-items: flex-start; }
+.ce-slot { display: flex; flex-direction: column; align-items: center; gap: 7px; }
+.ce-box { position: relative; padding: 0; background: #241910; border: 2px solid var(--gold); border-radius: 12px; box-sizing: content-box; }
+.ce-img { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; }
+.edit-num { position: absolute; transform: translate(-50%, -50%); font-family: var(--font-head);
+  cursor: grab; user-select: none; touch-action: none; white-space: nowrap; line-height: 1; }
+.edit-num.dark { color: #2a1d0c; text-shadow: 0 1px 2px rgba(255, 235, 180, .55); }
+.edit-num:not(.dark) { color: #fff; text-shadow: 0 1px 2px #000, 0 0 3px #000; }
+.edit-num:active { cursor: grabbing; }
+.ce-label { font-family: var(--font-head); color: var(--gold); font-size: 14px; }
+.ce-vals { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ce-readout { background: var(--panel); border: 1px solid var(--panel-light); border-radius: 8px;
+  padding: 8px 12px; display: block; max-width: 560px; margin: 20px auto 12px; color: var(--cream);
+  font-size: 12px; overflow-x: auto; }
+.ce-btns { display: flex; gap: 10px; justify-content: center; }
