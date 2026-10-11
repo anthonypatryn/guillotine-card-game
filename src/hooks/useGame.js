@@ -4,7 +4,7 @@ import {
   NOBLE_BY_ID, ACTION_BY_ID,
 } from '../data/cards';
 import { computeScore } from '../utils/scoring';
-import { getStep, applyResolved, canPlayCard } from '../utils/effects';
+import { getStep, applyResolved, canPlayCard, lineNobleCandidates } from '../utils/effects';
 import { moveNoble } from '../utils/line';
 
 const NUM_PLAYERS = 3;
@@ -32,6 +32,7 @@ function fresh() {
     current: 0,
     firstPlayer: 0,
     day: 1,
+    cpu: [false, false, false],   // which seats are computer-controlled
     line: [],
     nobleDeck: [], nobleDiscard: [],
     actionDeck: [], actionDiscard: [],
@@ -55,7 +56,7 @@ const pushLog = (log, ...entries) => [...log, ...entries].slice(-LOG_MAX);
 export function useGame() {
   const [G, setG] = useState(fresh);
 
-  const start = useCallback((names) => {
+  const start = useCallback((names, cpu) => {
     let actionDeck = buildActionDeck();
     let actionDiscard = [];
     const players = Array.from({ length: NUM_PLAYERS }, (_, i) =>
@@ -68,6 +69,7 @@ export function useGame() {
     setG({
       ...fresh(),
       phase: 'pass', players,
+      cpu: cpu || [false, false, false],
       line: nd.drawn, nobleDeck: nd.deck, nobleDiscard: nd.disc,
       actionDeck, actionDiscard,
       message: `Day 1 — pass to ${players[0].name}`,
@@ -185,9 +187,30 @@ export function useGame() {
     });
   }, []);
 
+  // A computer player takes its whole turn at once: maybe play one beneficial
+  // card, then collect. Kept atomic (the collect still logs, so the slice fires).
+  const cpuTurn = useCallback(() => {
+    setG(prev => {
+      if (prev.phase !== 'playing' || !prev.cpu?.[prev.current]) return prev;
+      let s = prev;
+      const choice = cpuChoose(s);
+      if (choice) {
+        const result = applyResolved(s, choice.def, choice.picks, { cardUid: choice.inst.uid });
+        s = finishAction(s, choice.def, choice.inst, result);
+      }
+      if (s.confusion[s.current])
+        s = { ...s, line: shuffle(s.line), confusion: s.confusion.map((v, i) => i === s.current ? false : v) };
+      s = s.flags.skipCollect
+        ? { ...s, flags: { ...s.flags, extraActionDraws: 0, endDayAfter: s.flags.endDayAfter || false } }
+        : collectSequence(s);
+      s = drawStep(s);
+      return advanceTurn(s);
+    });
+  }, []);
+
   return {
     G, start, restart, beginTurn, advanceFromPass: beginTurn,
-    playCard, pick, cancelTarget, collectAndEnd, discardFront,
+    playCard, pick, cancelTarget, collectAndEnd, discardFront, cpuTurn,
     canPlay: (handIdx) => {
       if (G.phase !== 'playing' || G.actionPlayed) return false;
       const inst = G.players[G.current].hand[handIdx];
@@ -197,6 +220,46 @@ export function useGame() {
       ? getStep(ACTION_BY_ID[G.pending.defId], G, G.pending.picks) : null,
     score: (p) => computeScore(p),
   };
+}
+
+// ─── CPU ─────────────────────────────────────────────────────────────────────
+function nobleValue(def) {
+  if (def.special === 'palaceGuard') return 2;
+  if (def.special === 'count' || def.special === 'countess') return 2;
+  if (def.special === 'tragicFigure') return -1;
+  return def.pts ?? 0;
+}
+
+// Greedy, safe heuristic: bring the best noble to the front / shove a bad one
+// back / grab an extra good head. Skips cards that need player targeting.
+function cpuChoose(G) {
+  const hand = G.players[G.current].hand;
+  const line = G.line;
+  if (!line.length) return null;
+  const frontVal = nobleValue(NOBLE_BY_ID[line[0].defId]);
+  let bestIdx = -1, bestVal = frontVal;
+  for (let i = 1; i < line.length; i++) {
+    const v = nobleValue(NOBLE_BY_ID[line[i].defId]);
+    if (v > bestVal) { bestVal = v; bestIdx = i; }
+  }
+  for (const inst of hand) {
+    const def = ACTION_BY_ID[inst.defId];
+    if (!canPlayCard(G, def)) continue;
+    const { family, params } = def;
+    if (bestIdx > 0 && family === 'toFrontEnd' && params.op === 'anyToFront')
+      return { inst, def, picks: [{ idx: bestIdx }] };
+    if (bestIdx > 0 && family === 'lineMove' && params.dir === 'fwd') {
+      const cands = lineNobleCandidates(def, line);
+      let pick = -1, pv = frontVal;
+      for (const i of cands) { const v = nobleValue(NOBLE_BY_ID[line[i].defId]); if (v > pv) { pv = v; pick = i; } }
+      if (pick >= 0) return { inst, def, picks: [{ idx: pick }] };
+    }
+    if (frontVal < 1 && family === 'toFrontEnd' && params.op === 'frontToEnd')
+      return { inst, def, picks: [] };
+    if (frontVal >= 2 && family === 'selfEconomy' && params.kind === 'doubleFeature')
+      return { inst, def, picks: [] };
+  }
+  return null;
 }
 
 // ─── pure helpers ───────────────────────────────────────────────────────────

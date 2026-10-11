@@ -22,6 +22,13 @@ export default function App() {
     }
   }, [G.phase, G.current, G.day]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Drive computer players: when it's a CPU's turn, take it after a beat.
+  useEffect(() => {
+    if (G.phase !== 'playing' || !G.cpu?.[G.current]) return;
+    const t = setTimeout(() => game.cpuTurn(), 850);
+    return () => clearTimeout(t);
+  }, [G.phase, G.current, G.day]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="app">
       <header className="topbar">
@@ -35,19 +42,43 @@ export default function App() {
   );
 }
 
+const MODES = {
+  solo:    { label: 'Solo — you + 2 CPU',   cpu: [false, true, true],  names: ['You', 'CPU 1', 'CPU 2'] },
+  duo:     { label: '2 Players + 1 CPU',    cpu: [false, false, true], names: ['Player 1', 'Player 2', 'CPU'] },
+  hotseat: { label: '3 Players (hotseat)',  cpu: [false, false, false], names: ['Player 1', 'Player 2', 'Player 3'] },
+};
+
 function StartScreen({ onStart }) {
-  const [names, setNames] = useState(['Player 1', 'Player 2', 'Player 3']);
+  const [mode, setMode] = useState('solo');
+  const [names, setNames] = useState(MODES.solo.names);
+  const cpu = MODES[mode].cpu;
+
+  const pickMode = (m) => { setMode(m); setNames(MODES[m].names); };
+
   return (
     <div className="screen center">
-      <h2>3-Player Hotseat</h2>
-      <p className="muted">Pass the device between turns. Most heads after 3 days wins.</p>
-      <div className="name-inputs">
-        {names.map((n, i) => (
-          <input key={i} value={n}
-            onChange={e => setNames(names.map((v, j) => j === i ? e.target.value : v))} />
+      <h2>Guillotine</h2>
+      <p className="muted">Most heads after 3 days wins.</p>
+
+      <div className="mode-pick">
+        {Object.entries(MODES).map(([k, m]) => (
+          <button key={k} className={'mode-btn' + (mode === k ? ' on' : '')} onClick={() => pickMode(k)}>
+            {m.label}
+          </button>
         ))}
       </div>
-      <button className="btn primary" onClick={() => onStart(names)}>Start Game</button>
+
+      <div className="name-inputs">
+        {names.map((n, i) => (
+          <label key={i} className="name-row">
+            <input value={n} disabled={cpu[i]}
+              onChange={e => setNames(names.map((v, j) => j === i ? e.target.value : v))} />
+            {cpu[i] && <span className="cpu-tag">CPU</span>}
+          </label>
+        ))}
+      </div>
+
+      <button className="btn primary" onClick={() => onStart(names, cpu)}>Start Game</button>
     </div>
   );
 }
@@ -280,7 +311,7 @@ function PlayerPanel({ player, index, game, step, onInspect }) {
     <div className={'player-panel' + (isCurrent ? ' active' : '') + (playerTarget ? ' selectable' : '')}
       onClick={playerTarget ? () => game.pick({ playerIdx: index }) : undefined}>
       <div className="panel-head">
-        <span className="pname">{player.name}{isCurrent ? ' ◄' : ''}</span>
+        <span className="pname">{player.name}{G.cpu?.[index] ? ' 🤖' : ''}{isCurrent ? ' ◄' : ''}</span>
         <span className="pscore" onClick={(e) => { e.stopPropagation(); setShowBreakdown(v => !v); }}>
           <ScoreDelta value={total} />
           {total} pts ▾

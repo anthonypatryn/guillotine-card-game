@@ -370,3 +370,19 @@
   .day-banner { display: none; }
   .noble-card:hover, .hand-card:hover { transform: none; }
 }
+
+/* ─── Start modes / CPU ─── */
+.mode-pick { display: flex; flex-direction: column; gap: 8px; width: 260px; }
+.mode-btn {
+  padding: 10px 16px; border-radius: 6px; border: 1px solid var(--panel-light);
+  background: var(--panel); color: var(--ink); cursor: pointer; font-size: 14px;
+}
+.mode-btn:hover { filter: brightness(1.15); }
+.mode-btn.on { border-color: var(--gold); background: var(--panel-light); font-weight: bold; }
+.name-row { display: flex; align-items: center; gap: 8px; }
+.name-row input { flex: 1; }
+.name-row input:disabled { opacity: .55; }
+.cpu-tag {
+  background: var(--accent); color: #fff; font-size: 10px; font-weight: bold;
+  padding: 2px 6px; border-radius: 4px; letter-spacing: .5px;
+}
