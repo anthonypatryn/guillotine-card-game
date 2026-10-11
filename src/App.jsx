@@ -268,6 +268,8 @@ const FACTION = {
   red:    { title: 'Military' },
   purple: { title: 'Royalty' },
 };
+// Basket order on the player card (matches the card mockup).
+const BASKET_ORDER = ['green', 'purple', 'red', 'blue', 'gray'];
 
 const _clamp = x => Math.max(0, Math.min(255, Math.round(x)));
 function shade(hex, amt) {
@@ -302,9 +304,23 @@ const BugIcon = (p) => <Ico {...p} d={<><rect x="8" y="7" width="8" height="12" 
 // the running count of heads caught in it.
 function BasketPip({ colorKey, count, title }) {
   return (
-    <span className="bpip" title={`${title}: ${count} head${count === 1 ? '' : 's'}`}>
+    <span className={'bpip' + (count ? '' : ' empty')} title={`${title}: ${count} head${count === 1 ? '' : 's'}`}>
       <img className="bpip-img" src={`/art/basket-${colorKey}.svg`} alt="" />
-      <span className="bpip-ct">{count}</span>
+      {count > 0 && <span className="bpip-ct">{count}</span>}
+    </span>
+  );
+}
+
+// Cards in hand, drawn as a little jaunty stack of cards with the count.
+function HandStack({ count }) {
+  return (
+    <span className="hand-stack" title={`${count} card${count === 1 ? '' : 's'} in hand`}>
+      <svg className="hand-stack-svg" viewBox="0 0 40 46" aria-hidden="true">
+        <rect x="5" y="9" width="24" height="33" rx="3" fill="#e7e1d3" stroke="#7d7566" strokeWidth="1" transform="rotate(-10 17 25)" />
+        <rect x="11" y="8" width="24" height="33" rx="3" fill="#f2ece0" stroke="#7d7566" strokeWidth="1" transform="rotate(7 23 24)" />
+        <rect x="8" y="6" width="24" height="33" rx="3" fill="#fff" stroke="#7d7566" strokeWidth="1" />
+      </svg>
+      <span className="hand-stack-ct">{count}</span>
     </span>
   );
 }
@@ -350,10 +366,10 @@ function accolades(players) {
 }
 
 // Total points shown over the severed-head silhouette (real art).
-function HeadScore({ value }) {
+function HeadScore({ value, gold }) {
   return (
-    <span className="headscore" title={`${value} points`}>
-      <img className="hs-img" src="/art/head.svg" alt="" />
+    <span className={'headscore' + (gold ? ' gold' : '')} title={`${value} points`}>
+      <img className="hs-img" src={gold ? '/art/head-gold.svg' : '/art/head.svg'} alt="" />
       <span className="hs-num">{value}</span>
     </span>
   );
@@ -554,25 +570,18 @@ function PlayerCard({ player, index, game, step, onInspect, onExpand }) {
 
   const tally = {};
   player.scorePile.forEach(inst => { const c = NOBLE_BY_ID[inst.defId].color; tally[c] = (tally[c] || 0) + 1; });
-  const colors = Object.keys(tally);
 
   return (
     <div className={'pcard' + (isCurrent ? ' active' : '') + (playerTarget ? ' selectable' : '')}
       data-pile={index}
       onClick={() => (playerTarget ? game.pick({ playerIdx: index }) : onExpand(index))}>
-      <div className="pc-head">
-        <span className="pc-name">{player.name}{G.cpu?.[index] && <span className="cpu-badge">CPU</span>}</span>
-        <span className="pc-score"><ScoreDelta value={total} /><HeadScore value={total} /></span>
+      <div className="pc-top">
+        <span className="pc-name"><span className="pc-name-txt">{player.name}</span>{G.cpu?.[index] && <span className="cpu-badge">CPU</span>}</span>
+        <HandStack count={player.hand.length} />
+        <span className="pc-score"><ScoreDelta value={total} /><HeadScore value={total} gold /></span>
       </div>
-      <div className="pc-stats">
-        <span className="pc-hand-ct" title="cards in hand"><CardsIcon className="pc-ico" /> {player.hand.length}</span>
-        <span className="pc-heads-ct" title="heads collected">
-          <HeadIcon color="var(--muted)" className="hc-small" /> {player.scorePile.length}
-        </span>
-        <span className="pc-tally">
-          {colors.length === 0 ? <span className="muted small">no heads</span>
-            : colors.map(c => <BasketPip key={c} colorKey={c} count={tally[c]} title={FACTION[c].title} />)}
-        </span>
+      <div className="pc-baskets">
+        {BASKET_ORDER.map(c => <BasketPip key={c} colorKey={c} count={tally[c] || 0} title={FACTION[c].title} />)}
       </div>
       {player.frontCards.length > 0 && (
         <div className="pc-fronts">
@@ -1006,13 +1015,18 @@ function ArtReview() {
       </header>
 
       <section>
-        <h2>Fleur-de-lis — pick one</h2>
+        <h2>Fleur-de-lis — your real art (pick one for the UI)</h2>
         <div className="art-grid">
-          <ArtTile src="/art/fleur-gold.svg" label="A · Gold" />
-          <ArtTile src="/art/fleur-silver.svg" label="B · Silver" />
-          <ArtTile src="/art/fleur-antique.svg" label="C · Antique" />
-          <ArtTile src="/art/fleur-polished.svg" label="D · Polished" />
-          <ArtTile src="/art/fleur.svg" label="Current (in use)" />
+          <ArtTile src="/art/fleur-real-gold.svg" label="Gold (in use)" />
+          <ArtTile src="/art/fleur-real-silver.svg" label="Silver" />
+          <ArtTile src="/art/fleur-real-bright.svg" label="Bright gold" />
+        </div>
+      </section>
+
+      <section>
+        <h2>Card layout target</h2>
+        <div className="art-grid">
+          <ArtTile src="/art-game.svg" label="Your card mockup (symbols are external PNGs — not embedded)" size={228} wide />
         </div>
       </section>
 
