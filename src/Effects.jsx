@@ -40,24 +40,28 @@ export function SliceFlier({ flier, onDone }) {
   useLayoutEffect(() => {
     const dx = to.x - from.x, dy = to.y - from.y;
     const sx = 8 + rng(uid + 3) * 8, sy = 16 + rng(uid + 5) * 10;
-    const dur = REDUCE ? 1 : 720;
+    const dur = REDUCE ? 1 : 840;
     const opt = { duration: dur, easing: 'cubic-bezier(.35,.1,.25,1)', fill: 'forwards' };
+    // 0–.14 = anticipation (the card presses down), .28 = the cut, then tumble to the pile.
     const aTop = topRef.current.animate([
-      { transform: 'translate(0,0) rotate(0) scale(1)', opacity: 1 },
-      { transform: `translate(${-sx}px,${-sy}px) rotate(${-4 - p.rot}deg)`, opacity: 1, offset: .18 },
-      { transform: `translate(${dx}px,${dy}px) rotate(${p.rot * 2}deg) scale(.34)`, opacity: .2 },
+      { transform: 'translate(0,0) rotate(0) scale(1)', opacity: 1, offset: 0 },
+      { transform: 'translate(0,3px) scale(1.03)', opacity: 1, offset: .14 },
+      { transform: `translate(${-sx}px,${-sy}px) rotate(${-4 - p.rot}deg)`, opacity: 1, offset: .3 },
+      { transform: `translate(${dx}px,${dy}px) rotate(${p.rot * 2}deg) scale(.34)`, opacity: .2, offset: 1 },
     ], opt);
     botRef.current.animate([
-      { transform: 'translate(0,0) rotate(0) scale(1)', opacity: 1 },
-      { transform: `translate(${sx}px,${sy}px) rotate(${4 + p.rot}deg)`, opacity: 1, offset: .18 },
-      { transform: `translate(${dx}px,${dy + 6}px) rotate(${-p.rot * 2}deg) scale(.34)`, opacity: .2 },
+      { transform: 'translate(0,0) rotate(0) scale(1)', opacity: 1, offset: 0 },
+      { transform: 'translate(0,3px) scale(1.03)', opacity: 1, offset: .14 },
+      { transform: `translate(${sx}px,${sy}px) rotate(${4 + p.rot}deg)`, opacity: 1, offset: .3 },
+      { transform: `translate(${dx}px,${dy + 6}px) rotate(${-p.rot * 2}deg) scale(.34)`, opacity: .2, offset: 1 },
     ], opt);
     if (slashRef.current && !REDUCE) {
       slashRef.current.animate([
-        { transform: 'scaleX(0)', opacity: 0 },
-        { transform: 'scaleX(1.1)', opacity: 1, offset: .1 },
-        { transform: 'scaleX(1.1)', opacity: 0, offset: .28 },
-        { opacity: 0 },
+        { transform: 'scaleX(0)', opacity: 0, offset: 0 },
+        { transform: 'scaleX(0)', opacity: 0, offset: .18 },
+        { transform: 'scaleX(1.1)', opacity: 1, offset: .3 },
+        { transform: 'scaleX(1.1)', opacity: 0, offset: .46 },
+        { opacity: 0, offset: 1 },
       ], { duration: dur, easing: 'ease-out', fill: 'forwards' });
     }
     aTop.onfinish = onDone;

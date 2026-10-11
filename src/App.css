@@ -705,3 +705,27 @@
 .bi-what { margin: 6px 0; white-space: pre-wrap; }
 .bi-log { background: rgba(0,0,0,.25); padding: 6px; border-radius: 6px; font-size: 11px; white-space: pre-wrap; overflow: auto; }
 .bi-actions { display: flex; gap: 6px; margin-top: 6px; }
+
+/* ===== Tier 1: callouts + action pulse (visual weight & hierarchy) ===== */
+.callout {
+  position: fixed; left: 50%; top: 16%; transform: translateX(-50%);
+  z-index: 58; pointer-events: none; text-align: center;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  border: 1px solid var(--gold); border-radius: 12px; padding: 10px 22px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.6); animation: calloutIn 1.9s ease forwards;
+}
+.co-who { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; }
+.co-name { font-family: var(--font-head); font-size: 27px; color: var(--gold); line-height: 1.1; }
+.co-text { font-size: 13px; color: var(--ink); max-width: 340px; margin-top: 2px; }
+@keyframes calloutIn {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(.95); }
+  8% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.03); }
+  16% { transform: translateX(-50%) translateY(0) scale(1); }
+  82% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+}
+
+.btn.primary.pulse { animation: btnPulse 1.5s ease-in-out infinite; }
+@keyframes btnPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-bright) 55%, transparent); }
+  55% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent-bright) 0%, transparent); }
+}

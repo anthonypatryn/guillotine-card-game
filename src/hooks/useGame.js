@@ -187,30 +187,21 @@ export function useGame() {
     });
   }, []);
 
-  // A computer player takes its whole turn at once: maybe play one beneficial
-  // card, then collect. Kept atomic (the collect still logs, so the slice fires).
-  const cpuTurn = useCallback(() => {
+  // A computer player's turn runs in two beats (driven by App): first it plays
+  // one beneficial card (or skips), then — after a pause — it collects.
+  const cpuPlay = useCallback(() => {
     setG(prev => {
-      if (prev.phase !== 'playing' || !prev.cpu?.[prev.current]) return prev;
-      let s = prev;
-      const choice = cpuChoose(s);
-      if (choice) {
-        const result = applyResolved(s, choice.def, choice.picks, { cardUid: choice.inst.uid });
-        s = finishAction(s, choice.def, choice.inst, result);
-      }
-      if (s.confusion[s.current])
-        s = { ...s, line: shuffle(s.line), confusion: s.confusion.map((v, i) => i === s.current ? false : v) };
-      s = s.flags.skipCollect
-        ? { ...s, flags: { ...s.flags, extraActionDraws: 0, endDayAfter: s.flags.endDayAfter || false } }
-        : collectSequence(s);
-      s = drawStep(s);
-      return advanceTurn(s);
+      if (prev.phase !== 'playing' || !prev.cpu?.[prev.current] || prev.actionPlayed) return prev;
+      const choice = cpuChoose(prev);
+      if (!choice) return { ...prev, actionPlayed: true, message: `${prev.players[prev.current].name} lines up a head…` };
+      const result = applyResolved(prev, choice.def, choice.picks, { cardUid: choice.inst.uid });
+      return finishAction(prev, choice.def, choice.inst, result);
     });
   }, []);
 
   return {
     G, start, restart, beginTurn, advanceFromPass: beginTurn,
-    playCard, pick, cancelTarget, collectAndEnd, discardFront, cpuTurn,
+    playCard, pick, cancelTarget, collectAndEnd, discardFront, cpuPlay,
     canPlay: (handIdx) => {
       if (G.phase !== 'playing' || G.actionPlayed) return false;
       const inst = G.players[G.current].hand[handIdx];
@@ -304,7 +295,8 @@ function finishAction(prev, def, inst, result) {
   } else {
     next.message = message || `${def.name} played. Now collect the front noble.`;
   }
-  next.log = pushLog(prev.log, logEntry('play', `▶ ${prev.players[prev.current].name} played ${def.name}.`));
+  next.log = pushLog(prev.log, logEntry('play', `▶ ${prev.players[prev.current].name} played ${def.name}.`,
+    { defId: def.id, playerIdx: prev.current }));
   return next;
 }
 

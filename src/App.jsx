@@ -90,12 +90,12 @@ export default function App() {
     }
   }, [G.phase, G.current, G.day]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Drive computer players.
+  // Drive computer players in two beats: play a card, then (after a pause) behead.
   useEffect(() => {
     if (G.phase !== 'playing' || !G.cpu?.[G.current]) return;
-    const t = setTimeout(() => game.cpuTurn(), 850);
+    const t = setTimeout(() => { if (G.actionPlayed) game.collectAndEnd(); else game.cpuPlay(); }, 900);
     return () => clearTimeout(t);
-  }, [G.phase, G.current, G.day]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [G.phase, G.current, G.day, G.actionPlayed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'bugs')
     return <div className="app"><BugViewer /></div>;
@@ -284,16 +284,23 @@ function Board({ game }) {
   const [expanded, setExpanded] = useState(null);
   const [fliers, setFliers] = useState([]);
   const [splats, setSplats] = useState([]);
+  const [callout, setCallout] = useState(null);
   const seen = useRef(0);
   const lineRects = useRef({});
 
-  // Diff new log entries → a slice + blood splatter for each beheading.
+  // Diff new log entries → slice + blood for beheadings, callout for plays.
   useLayoutEffect(() => {
     const fresh = G.log.filter(l => l.id > seen.current);
     if (!fresh.length) return;
     seen.current = Math.max(seen.current, ...fresh.map(l => l.id));
     const nf = [], ns = [];
+    let lastPlay = null;
     for (const e of fresh) {
+      if (e.kind === 'play' && e.defId) {
+        const def = ACTION_BY_ID[e.defId];
+        lastPlay = { key: e.id, who: G.players[e.playerIdx]?.name, name: def.name, text: def.text };
+        continue;
+      }
       if (e.kind !== 'collect') continue;
       playBehead();
       const from = lineRects.current[String(e.uid)];
@@ -306,7 +313,15 @@ function Board({ game }) {
     }
     if (nf.length) setFliers(f => [...f, ...nf]);
     if (ns.length) setSplats(s => [...s, ...ns]);
+    if (lastPlay) setCallout(lastPlay);
   });
+
+  // auto-clear the callout
+  useEffect(() => {
+    if (!callout) return;
+    const t = setTimeout(() => setCallout(null), 1900);
+    return () => clearTimeout(t);
+  }, [callout]);
 
   // Capture current line-token positions every render (for the fly-from point).
   useLayoutEffect(() => {
@@ -340,7 +355,8 @@ function Board({ game }) {
 
         <div className="controls">
           {!targeting && (
-            <button className="btn primary" onClick={game.collectAndEnd}>
+            <button className={'btn primary' + (!G.cpu?.[G.current] && G.line.length > 0 ? ' pulse' : '')}
+              onClick={game.collectAndEnd}>
               {G.line.length === 0 ? 'End turn →' : 'Off with their head!'}
             </button>
           )}
@@ -397,6 +413,7 @@ function Board({ game }) {
         {splats.map(s => <BloodSplatter key={s.key} splat={s} onDone={() => setSplats(x => x.filter(y => y.key !== s.key))} />)}
         {fliers.map(f => <SliceFlier key={f.key} flier={f} onDone={() => setFliers(x => x.filter(y => y.key !== f.key))} />)}
       </div>
+      {callout && <Callout callout={callout} />}
       <DayBanner day={G.day} />
     </div>
   );
@@ -452,6 +469,16 @@ function PlayerCard({ player, index, game, step, onInspect, onExpand }) {
         </div>
       )}
       <div className="pc-expand">view heads ▾</div>
+    </div>
+  );
+}
+
+function Callout({ callout }) {
+  return (
+    <div className="callout" key={callout.key}>
+      <div className="co-who">{callout.who} played</div>
+      <div className="co-name">{callout.name}</div>
+      <div className="co-text">{callout.text}</div>
     </div>
   );
 }
