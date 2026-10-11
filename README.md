@@ -43,6 +43,11 @@ Crowd, etc. (`src/utils/scoring.js`).
 - CPU opponents fight under **French-Resistance code-names** (Le Renard, La
   Chouette, …) at three nerve levels: **Recrue** (easy, hesitant), **Résistant**
   (medium), **Maquisard** (hard, ruthless) — `cpuChoose()` in `useGame.js`.
+- **Online** — "Play Online" on the start screen: host a room (get a 5-letter
+  code) or join by code / invite link (`/?join=CODE`). Peer-to-peer over WebRTC
+  (PeerJS, host-authoritative — the host runs the engine and streams sanitized
+  per-seat state; friends send actions for their own seat). No game server/DB.
+  See `src/net/room.js` (`HostRoom`/`JoinClient`) and the `*Shell` components.
 
 ## Features
 
@@ -114,4 +119,6 @@ the next player. CPU players only play targeting-free "safe" actions.
 
 Push to `main` → Vercel auto-deploys. The bug API (`api/bugs.js`) needs
 `KV_REST_API_URL`, `KV_REST_API_TOKEN`, and `BUG_PIN` set in the Vercel
-project's **Environment Variables**.
+project's **Environment Variables**. For online play on strict networks / phone
+data, set `CF_TURN_KEY_ID` + `CF_TURN_API_TOKEN` (Cloudflare TURN) so `api/turn.js`
+can hand out relay credentials — without them online still works over direct P2P.
