@@ -92,7 +92,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1><Fleur className="title-fleur" />Guillotine</h1>
+        <img className="topbar-logo" src="/logo.jpg" alt="Guillotine" />
         <span className="tagline">win by getting a head</span>
         <button className="nav-btn theme-btn" onClick={() => setShowTheme(true)} title="Theme &amp; fonts">🎨</button>
         <MusicPlayer />
@@ -118,8 +118,7 @@ function StartScreen({ onStart }) {
   const pickMode = (m) => { setMode(m); setNames(MODES[m].names); };
   return (
     <div className="screen center">
-      <div className="go-fleurs"><Fleur className="fleur" /><Fleur className="fleur" /><Fleur className="fleur" /></div>
-      <h2>Guillotine</h2>
+      <img className="start-logo" src="/logo.jpg" alt="Guillotine" />
       <p className="muted">The revolutionary card game where you win by getting a head.</p>
       <div className="mode-pick">
         {Object.entries(MODES).map(([k, m]) => (

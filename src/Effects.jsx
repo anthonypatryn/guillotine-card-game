@@ -136,5 +136,14 @@ export function ScoreDelta({ value }) {
 }
 
 export function DayBanner({ day }) {
-  return <div className="day-banner" key={day}>Day {day}</div>;
+  return (
+    <div className="day-banner" key={day}>
+      <div className="db-sweep" />
+      <div className="db-inner">
+        <span className="db-fleur">⚜</span>
+        <span className="db-text">Day {day} <span className="db-sub">of 3</span></span>
+        <span className="db-fleur">⚜</span>
+      </div>
+    </div>
+  );
 }
