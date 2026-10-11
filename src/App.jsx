@@ -273,27 +273,11 @@ const FACTION = {
 // Basket order on the player card (matches the card mockup).
 const BASKET_ORDER = ['green', 'purple', 'red', 'blue', 'gray'];
 
-const _clamp = x => Math.max(0, Math.min(255, Math.round(x)));
-function shade(hex, amt) {
-  const n = parseInt(hex.slice(1), 16);
-  const r = _clamp(((n >> 16) & 255) + amt), g = _clamp(((n >> 8) & 255) + amt), b = _clamp((n & 255) + amt);
-  return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
-}
-
-function HeadIcon({ color = 'currentColor', className }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
-      <path fill={color} d="M12 2.6a5 5 0 0 1 5 5c0 2-1.1 3.7-2.8 4.6l.5 2.1c3.1.6 5.3 2.3 5.3 4.6V21H4v-2.1c0-2.3 2.2-4 5.3-4.6l.5-2.1A5 5 0 0 1 7 7.6a5 5 0 0 1 5-5z" />
-    </svg>
-  );
-}
-
-// Small clean line-icons (no emoji) for counts and media controls.
+// Small clean line-icons (no emoji) for media controls.
 const Ico = ({ d, vb = '0 0 24 24', className, fill = 'none', stroke = 'currentColor' }) => (
   <svg className={className} viewBox={vb} fill={fill} stroke={stroke} strokeWidth="2"
     strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>
 );
-const CardsIcon = (p) => <Ico {...p} d={<><rect x="3" y="6" width="12" height="15" rx="1.5" /><path d="M8 3h11a2 2 0 0 1 2 2v13" /></>} />;
 const PlayIcon = (p) => <Ico {...p} fill="currentColor" stroke="none" d={<path d="M7 4.5v15l12-7.5z" />} />;
 const PauseIcon = (p) => <Ico {...p} fill="currentColor" stroke="none" d={<><rect x="6" y="4.5" width="4" height="15" rx="1" /><rect x="14" y="4.5" width="4" height="15" rx="1" /></>} />;
 const NextIcon = (p) => <Ico {...p} fill="currentColor" stroke="none" d={<><path d="M6 4.5v15l11-7.5z" /><rect x="17" y="4.5" width="3" height="15" rx="1" /></>} />;
@@ -327,19 +311,6 @@ function HandStack({ count }) {
   );
 }
 
-function Fleur({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 120 96" aria-hidden="true">
-      <g fill="currentColor">
-        <path d="M60 5 C52 24 52 45 60 62 C68 45 68 24 60 5 Z" />
-        <path d="M60 60 C45 51 31 39 29 21 C45 25 57 42 60 60 Z" />
-        <path d="M60 60 C75 51 89 39 91 21 C75 25 63 42 60 60 Z" />
-        <rect x="45" y="60" width="30" height="9" rx="2.5" />
-        <path d="M55 69 H65 L69 88 C69 93 51 93 51 88 Z" />
-      </g>
-    </svg>
-  );
-}
 
 // Fun French end-game awards derived from each player's collected heads.
 function accolades(players) {
