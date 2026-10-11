@@ -1135,3 +1135,13 @@
 .pc-baskets .bpip.empty { opacity: .32; filter: grayscale(.4); }
 .pc-baskets .bpip-ct { font-size: 13px; }
 .pcard .pc-expand { margin-top: 8px; }
+
+/* winner marker uses the chosen fleur */
+.notice-rank .go-crown { width: 26px; height: auto; }
+
+/* home-page ghosted fleur-de-lis pattern (45°, silver) */
+.start-screen { position: relative; }
+.start-fleurs { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.start-fleurs::before { content: ''; position: absolute; inset: -35%;
+  background: url('/art/fleur.svg') repeat; background-size: 74px 90px; transform: rotate(45deg); opacity: .05; }
+.start-screen > :not(.start-fleurs) { position: relative; z-index: 1; }

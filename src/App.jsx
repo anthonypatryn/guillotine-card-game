@@ -174,7 +174,8 @@ function StartScreen({ onStart }) {
     seats.map(s => (s.human ? 0 : s.level)),
   );
   return (
-    <div className="screen center">
+    <div className="screen center start-screen">
+      <div className="start-fleurs" aria-hidden="true" />
       <img className="start-logo" src="/logo-title.png" alt="Guillotine" />
       <p className="muted">The revolutionary card game where you win by getting a head.</p>
       <div className="count-pick">
@@ -224,7 +225,7 @@ function GameOver({ G, onRestart }) {
             <div key={r.name} className={'notice' + (r.total === max ? ' win' : '')}
               style={{ '--rot': `${(place % 2 ? 1 : -1) * (1.4 + place * 0.5)}deg`, '--d': `${0.55 + place * 0.2}s` }}>
               <span className="nail" />
-              <span className="notice-rank">{place === 0 ? <Fleur className="go-crown" /> : `${place + 1}`}</span>
+              <span className="notice-rank">{place === 0 ? <img className="go-crown" src="/art/fleur.svg" alt="winner" /> : `${place + 1}`}</span>
               <span className="notice-name">{r.name}</span>
               <span className="notice-score"><HeadScore value={r.total} /></span>
               <span className="notice-awards">
@@ -1017,8 +1018,8 @@ function ArtReview() {
       <section>
         <h2>Fleur-de-lis — your real art (pick one for the UI)</h2>
         <div className="art-grid">
-          <ArtTile src="/art/fleur-real-gold.svg" label="Gold (in use)" />
-          <ArtTile src="/art/fleur-real-silver.svg" label="Silver" />
+          <ArtTile src="/art/fleur-real-gold.svg" label="Gold" />
+          <ArtTile src="/art/fleur-real-silver.svg" label="Silver (in use)" />
           <ArtTile src="/art/fleur-real-bright.svg" label="Bright gold" />
         </div>
       </section>
