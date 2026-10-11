@@ -142,17 +142,39 @@ export function ScoreDelta({ value }) {
   </span>;
 }
 
+// A card flying off a draw pile to where it lands (line / hand). Cosmetic: a
+// card-back that arcs from the deck to the destination and fades as it settles.
+export function DealFlier({ deal, onDone }) {
+  const ref = useRef(null);
+  const { from, to, back, delay = 0 } = deal;
+  useLayoutEffect(() => {
+    if (_reduce) { onDone(); return; }
+    const dx = to.x - from.x, dy = to.y - from.y;
+    const a = ref.current.animate([
+      { transform: 'translate(0,0) scale(.86) rotate(-6deg)', opacity: 0, offset: 0 },
+      { opacity: 1, offset: .14 },
+      { transform: `translate(${dx * 0.5}px,${dy * 0.5 - 26}px) scale(1.02) rotate(3deg)`, opacity: 1, offset: .55 },
+      { transform: `translate(${dx}px,${dy}px) scale(.78) rotate(0)`, opacity: 0, offset: 1 },
+    ], { duration: 470, delay, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'backwards' });
+    a.onfinish = onDone;
+    return () => a.cancel();
+  }, []);
+  return <img ref={ref} className="deal-flier" src={back} alt=""
+    style={{ left: from.x - 22, top: from.y - 31 }} />;
+}
+
 // A clock wipe to a solid panel showing the day (rooster crows at dawn), then
 // the clock wipes back to reveal the board.
 export function DayBanner({ day }) {
   useEffect(() => { if (!_reduce) playRooster(); }, [day]);
   return (
-    <div className="day-clock" key={day} aria-hidden="true">
+    <div className="day-clock" key={day} data-day={day} aria-hidden="true">
+      <div className="dc-fleurs" />
       <div className="dc-face">
-        <span className="dc-fleur">⚜</span>
+        <img className="dc-fleur" src="/art/fleur.svg" alt="" />
         <span className="dc-day">Day {day}</span>
         <span className="dc-sub">of 3</span>
-        <span className="dc-fleur">⚜</span>
+        <img className="dc-fleur" src="/art/fleur.svg" alt="" />
       </div>
     </div>
   );

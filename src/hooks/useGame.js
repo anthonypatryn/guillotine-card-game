@@ -84,7 +84,7 @@ export function useGame() {
       line: nd.drawn, nobleDeck: nd.deck, nobleDiscard: nd.disc,
       actionDeck, actionDiscard,
       message: `Day 1 — pass to ${players[0].name}`,
-      log: [logEntry('day', `🏁 Game start — Day 1, ${n} players, 12 nobles in line.`)],
+      log: [logEntry('day', `Game start — Day 1, ${n} players, 12 nobles in line.`)],
     });
   }, []);
 
@@ -184,7 +184,7 @@ export function useGame() {
         i === prev.current ? { ...p, frontCards: p.frontCards.filter(c => c.uid !== cardUid) } : p);
       return { ...prev, players, actionDiscard: [...prev.actionDiscard, card],
         message: `${ACTION_BY_ID[card.defId].name} discarded.`,
-        log: pushLog(prev.log, logEntry('discard', `🗑 ${prev.players[prev.current].name} discarded ${ACTION_BY_ID[card.defId].name}.`)) };
+        log: pushLog(prev.log, logEntry('discard', `${prev.players[prev.current].name} discarded ${ACTION_BY_ID[card.defId].name}.`)) };
     });
   }, []);
 
@@ -331,7 +331,7 @@ function finishAction(prev, def, inst, result) {
   } else {
     next.message = message || `${def.name} played. Now collect the front noble.`;
   }
-  next.log = pushLog(prev.log, logEntry('play', `▶ ${prev.players[prev.current].name} played ${def.name}.`,
+  next.log = pushLog(prev.log, logEntry('play', `${prev.players[prev.current].name} played ${def.name}.`,
     { defId: def.id, playerIdx: prev.current }));
   return next;
 }
@@ -360,11 +360,11 @@ function collectSequence(prev) {
     if (def.special === 'clown') {
       const other = (cur + 1) % players.length;
       players[other].scorePile.push(inst);
-      logLines.push(logEntry('collect', `🤡 ${def.name} went to ${players[other].name}.`,
+      logLines.push(logEntry('collect', `${def.name} went to ${players[other].name}.`,
         { uid: inst.uid, defId: inst.defId, playerIdx: other }));
     } else {
       players[cur].scorePile.push(inst);
-      logLines.push(logEntry('collect', `✂ ${curName} collected ${def.name}.`,
+      logLines.push(logEntry('collect', `${curName} collected ${def.name}.`,
         { uid: inst.uid, defId: inst.defId, playerIdx: cur }));
     }
 
@@ -408,7 +408,7 @@ function endDay(s, discardRemaining) {
   if (discardRemaining && s.line.length) nobleDiscard = [...nobleDiscard, ...s.line];
   if (s.day >= TOTAL_DAYS)
     return { ...s, line: [], nobleDiscard, phase: 'gameOver', message: 'Game over!',
-      log: pushLog(s.log, logEntry('day', '🏁 Day 3 over — game over!')) };
+      log: pushLog(s.log, logEntry('day', 'Day 3 over — game over!')) };
 
   const day = s.day + 1;
   const firstPlayer = (s.firstPlayer + 1) % s.players.length;
@@ -418,6 +418,6 @@ function endDay(s, discardRemaining) {
     line: nd.drawn, nobleDeck: nd.deck, nobleDiscard: nd.disc,
     phase: 'pass', flags: freshFlags(),
     message: `Day ${day} — pass to ${s.players[firstPlayer].name}`,
-    log: pushLog(s.log, logEntry('day', `📅 Day ${day} begins — 12 new nobles in line.`)),
+    log: pushLog(s.log, logEntry('day', `Day ${day} begins — 12 new nobles in line.`)),
   };
 }

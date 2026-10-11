@@ -3,11 +3,11 @@ import './App.css';
 import { useGame } from './hooks/useGame';
 import {
   NOBLE_BY_ID, ACTION_BY_ID, COLOR_HEX, COLORS,
-  nobleImg, actionImg,
+  nobleImg, actionImg, NOBLE_BACK, ACTION_BACK,
 } from './data/cards';
 import { computeScore } from './utils/scoring';
-import { judgeBlocks, callousActive } from './utils/effects';
-import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner, setReduce } from './Effects';
+import { judgeBlocks, callousActive, lineNobleCandidates } from './utils/effects';
+import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner, DealFlier, setReduce } from './Effects';
 import { playBehead, playWhoosh, playBell, isMuted, toggleMuted } from './sound';
 
 // ─── Themes: color palettes + font sets (chosen in the Theme sheet) ─────────
@@ -117,6 +117,14 @@ export default function App() {
     return () => clearTimeout(t);
   }, [G.phase, G.current, G.day, G.actionPlayed, speed]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Human: once your action has fully resolved (and didn't grant a second
+  // action), the behead is automatic — collecting the front noble is mandatory.
+  useEffect(() => {
+    if (G.phase !== 'playing' || G.cpu?.[G.current] || !G.actionPlayed) return;
+    const t = setTimeout(() => game.collectAndEnd(), Math.round(720 / speed));
+    return () => clearTimeout(t);
+  }, [G.phase, G.current, G.day, G.actionPlayed, speed]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'bugs')
     return <div className="app"><BugViewer /></div>;
 
@@ -127,7 +135,7 @@ export default function App() {
         <span className="tagline">win by getting a head</span>
         <button className="nav-btn" onClick={() => setShowHelp(true)} title="How to play">?</button>
         <button className="nav-btn" onClick={toggleSpeed} title="CPU speed">{speed}×</button>
-        <button className="nav-btn theme-btn" onClick={() => setShowTheme(true)} title="Theme &amp; fonts">🎨</button>
+        <button className="nav-btn theme-btn" onClick={() => setShowTheme(true)} title="Theme &amp; fonts">Aa</button>
         <MusicPlayer />
       </header>
       {showTheme && <ThemeSheet theme={theme} setTheme={setTheme} close={() => setShowTheme(false)} />}
@@ -185,7 +193,7 @@ function StartScreen({ onStart }) {
         {seats.map((s, i) => (
           <div key={i} className={'seat-row' + (s.human ? ' is-human' : ' is-cpu')}>
             <button className="seat-toggle" onClick={() => toggleHuman(i)} title="Switch Human / Computer">
-              {s.human ? '🧑 Human' : '🤖 CPU'}
+              {s.human ? 'Human' : 'CPU'}
             </button>
             <input className="seat-name" value={s.name} onChange={e => patch(i, { name: e.target.value })} />
             {!s.human && (
@@ -213,23 +221,24 @@ function GameOver({ G, onRestart }) {
   const max = rows[0].total;
   const winners = rows.filter(r => r.total === max).map(r => r.name);
   return (
-    <div className="screen center gameover">
-      <div className="go-fleurs"><Fleur className="fleur" /><Fleur className="fleur" /><Fleur className="fleur" /></div>
-      <h2>Fin de la Révolution</h2>
-      <h3 className="go-winner">
-        {winners.length > 1 ? `Tie — ${winners.join(' & ')}!` : `${winners[0]} wins!`}
-      </h3>
-      <div className="go-rows">
-        {rows.map((r, place) => (
-          <div key={r.name} className={'go-row' + (r.total === max ? ' win' : '')}>
-            <span className="go-place">{place === 0 ? '👑' : `${place + 1}.`}</span>
-            <span className="go-name">{r.name}</span>
-            <span className="go-score"><HeadScore value={r.total} /></span>
-            <span className="go-awards">
-              {awards[r.idx].map(a => <span key={a.title} className="award" title={a.desc}>{a.title}</span>)}
-            </span>
-          </div>
-        ))}
+    <div className="screen center gameover go-wipe">
+      <div className="noticeboard">
+        <div className="nb-title">Fin de la Révolution</div>
+        <div className="nb-winner">{winners.length > 1 ? `Tie — ${winners.join(' & ')}!` : `${winners[0]} wins!`}</div>
+        <div className="notices">
+          {rows.map((r, place) => (
+            <div key={r.name} className={'notice' + (r.total === max ? ' win' : '')}
+              style={{ '--rot': `${(place % 2 ? 1 : -1) * (1.4 + place * 0.5)}deg`, '--d': `${0.55 + place * 0.2}s` }}>
+              <span className="nail" />
+              <span className="notice-rank">{place === 0 ? <Fleur className="go-crown" /> : `${place + 1}`}</span>
+              <span className="notice-name">{r.name}</span>
+              <span className="notice-score"><HeadScore value={r.total} /></span>
+              <span className="notice-awards">
+                {awards[r.idx].map(a => <span key={a.title} className="award" title={a.desc}>{a.title}</span>)}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
       <p className="go-cry">Vive la Révolution !</p>
       <button className="btn primary" onClick={onRestart}>Encore ! (Play Again)</button>
@@ -237,16 +246,33 @@ function GameOver({ G, onRestart }) {
   );
 }
 
+// Which line nobles an action card would affect right now (for the hover hint).
+function affectedLineUids(def, G) {
+  const line = G.line;
+  if (!def || !line.length) return null;
+  const idxs = new Set();
+  const { family, params } = def;
+  if (family === 'lineMove' || family === 'lineNoble' || family === 'reorder') {
+    try { lineNobleCandidates(def, line).forEach(i => idxs.add(i)); } catch { /* ignore */ }
+  }
+  if (family === 'toFrontEnd') {
+    if (params?.op === 'frontToEnd') idxs.add(0);
+    else if (params?.op === 'anyToFront') line.forEach((_, i) => idxs.add(i));
+  }
+  if (!idxs.size) return null;
+  return new Set([...idxs].map(i => line[i]?.uid).filter(Boolean));
+}
+
 const nobleInspect = (def, el) => ({ img: nobleImg(def.id), name: def.name, faction: def.color, factionName: FACTION[def.color].title, text: def.text, color: COLOR_HEX[def.color], rect: el?.getBoundingClientRect() });
 const actionInspect = (def, el) => ({ img: actionImg(def.id), name: def.name, text: def.text, color: '#b4323d', rect: el?.getBoundingClientRect() });
 
 // Faction = noble color. Each has a title and an emblem shown in the point box.
 const FACTION = {
-  blue:   { title: 'Clergy',       sym: '✝' },
-  green:  { title: 'Judiciary',    sym: '⚖' },
-  gray:   { title: 'Common folk',  sym: '⚒' },
-  red:    { title: 'Military',     sym: '⚔' },
-  purple: { title: 'Royalty',      sym: '♛' },
+  blue:   { title: 'Clergy' },
+  green:  { title: 'Judiciary' },
+  gray:   { title: 'Common folk' },
+  red:    { title: 'Military' },
+  purple: { title: 'Royalty' },
 };
 
 const _clamp = x => Math.max(0, Math.min(255, Math.round(x)));
@@ -263,6 +289,20 @@ function HeadIcon({ color = 'currentColor', className }) {
     </svg>
   );
 }
+
+// Small clean line-icons (no emoji) for counts and media controls.
+const Ico = ({ d, vb = '0 0 24 24', className, fill = 'none', stroke = 'currentColor' }) => (
+  <svg className={className} viewBox={vb} fill={fill} stroke={stroke} strokeWidth="2"
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>
+);
+const CardsIcon = (p) => <Ico {...p} d={<><rect x="3" y="6" width="12" height="15" rx="1.5" /><path d="M8 3h11a2 2 0 0 1 2 2v13" /></>} />;
+const PlayIcon = (p) => <Ico {...p} fill="currentColor" stroke="none" d={<path d="M7 4.5v15l12-7.5z" />} />;
+const PauseIcon = (p) => <Ico {...p} fill="currentColor" stroke="none" d={<><rect x="6" y="4.5" width="4" height="15" rx="1" /><rect x="14" y="4.5" width="4" height="15" rx="1" /></>} />;
+const NextIcon = (p) => <Ico {...p} fill="currentColor" stroke="none" d={<><path d="M6 4.5v15l11-7.5z" /><rect x="17" y="4.5" width="3" height="15" rx="1" /></>} />;
+const SpeakerIcon = ({ muted, ...p }) => <Ico {...p} d={muted
+  ? <><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none" /><path d="M17 9l5 5M22 9l-5 5" /></>
+  : <><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none" /><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" /></>} />;
+const BugIcon = (p) => <Ico {...p} d={<><rect x="8" y="7" width="8" height="12" rx="4" /><path d="M12 7V4M9 5l2 2M15 5l-2 2M8 10H4M8 14H3.5M8 18l-3 2M16 10h4M16 14h4.5M16 18l3 2" /></>} />;
 
 // A faction's collected heads shown in its tribe-colored basket (real art) with
 // the running count of heads caught in it.
@@ -298,12 +338,12 @@ function accolades(players) {
     return bi;
   };
   const DEFS = [
-    { title: '👑 La Tête Royale', desc: 'most royals beheaded', idx: winnerBy(s => s.byColor.purple || 0) },
-    { title: '⚔ Le Général',     desc: 'most military',        idx: winnerBy(s => s.byColor.red || 0) },
-    { title: '✝ Le Dévot',       desc: 'most clergy',          idx: winnerBy(s => s.byColor.blue || 0) },
-    { title: '⚖ La Justice',     desc: 'most judiciary',       idx: winnerBy(s => s.byColor.green || 0) },
-    { title: '⚒ Ami du Peuple',  desc: 'most common folk',     idx: winnerBy(s => s.byColor.gray || 0) },
-    { title: '🧺 Le Boucher',    desc: 'most heads overall',   idx: winnerBy(s => s.total) },
+    { title: 'La Tête Royale', desc: 'most royals beheaded', idx: winnerBy(s => s.byColor.purple || 0) },
+    { title: 'Le Général',     desc: 'most military',        idx: winnerBy(s => s.byColor.red || 0) },
+    { title: 'Le Dévot',       desc: 'most clergy',          idx: winnerBy(s => s.byColor.blue || 0) },
+    { title: 'La Justice',     desc: 'most judiciary',       idx: winnerBy(s => s.byColor.green || 0) },
+    { title: 'Ami du Peuple',  desc: 'most common folk',     idx: winnerBy(s => s.byColor.gray || 0) },
+    { title: 'Le Boucher',     desc: 'most heads overall',   idx: winnerBy(s => s.total) },
   ];
   const per = players.map(() => []);
   DEFS.forEach(d => { if (d.idx >= 0) per[d.idx].push(d); });
@@ -331,15 +371,22 @@ function Board({ game }) {
   const onInspect = (ins) => {
     clearTimeout(inspectT.current);
     if (ins) setInspect(ins);
-    else inspectT.current = setTimeout(() => setInspect(null), 140);
+    else inspectT.current = setTimeout(() => setInspect(null), 420);
   };
   const keepInspect = () => clearTimeout(inspectT.current);
   const [expanded, setExpanded] = useState(null);
+  const [hintUids, setHintUids] = useState(null);
   const [fliers, setFliers] = useState([]);
   const [splats, setSplats] = useState([]);
+  const [deals, setDeals] = useState([]);
+  const [dropTick, setDropTick] = useState(0);
   const [callout, setCallout] = useState(null);
   const seen = useRef(0);
   const lineRects = useRef({});
+  const deckRects = useRef({});
+  const prevDay = useRef(0);
+  const prevLine = useRef(0);
+  const prevHandLen = useRef(0);
 
   // Diff new log entries → slice + blood for beheadings, callout for plays.
   useLayoutEffect(() => {
@@ -357,6 +404,7 @@ function Board({ game }) {
       }
       if (e.kind !== 'collect') continue;
       playBehead();
+      setDropTick(t => t + 1);
       const from = lineRects.current[String(e.uid)];
       const pile = document.querySelector(`[data-pile="${e.playerIdx}"]`);
       if (!from || !pile) continue;
@@ -377,20 +425,53 @@ function Board({ game }) {
     return () => clearTimeout(t);
   }, [callout]);
 
-  // Capture current line-token positions every render (for the fly-from point).
+  // Capture current line-token + draw-pile positions every render (fly points).
   useLayoutEffect(() => {
     const map = {};
     document.querySelectorAll('.noble-card[data-line-uid]').forEach(el => {
       map[el.getAttribute('data-line-uid')] = el.getBoundingClientRect();
     });
     lineRects.current = map;
+    const dmap = {};
+    document.querySelectorAll('[data-deck]').forEach(el => {
+      dmap[el.getAttribute('data-deck')] = el.getBoundingClientRect();
+    });
+    deckRects.current = dmap;
+  });
+
+  // Deal cards out of the draw piles: nobles → line (new day / opening), and
+  // actions → the human hand when it grows. Diffs counts, like the log diff.
+  useLayoutEffect(() => {
+    const nd = deckRects.current.noble, ad = deckRects.current.action;
+    const add = [];
+    const lineGrew = G.line.length > prevLine.current;
+    if (nd && lineGrew && (G.day !== prevDay.current || prevLine.current === 0)) {
+      const from = { x: nd.left + nd.width / 2, y: nd.top + nd.height / 2 };
+      Object.values(lineRects.current).forEach((r, i) => {
+        add.push({ key: `nd-${G.day}-${i}-${seen.current}`, back: NOBLE_BACK, from,
+          to: { x: r.left + r.width / 2, y: r.top + r.height / 2 }, delay: i * 55 });
+      });
+    }
+    const curHand = G.players[G.current]?.hand.length ?? 0;
+    if (ad && !G.cpu?.[G.current] && curHand > prevHandLen.current) {
+      const dock = document.querySelector('.hand-dock');
+      if (dock) {
+        const dr = dock.getBoundingClientRect();
+        const from = { x: ad.left + ad.width / 2, y: ad.top + ad.height / 2 };
+        const k = Math.min(curHand - prevHandLen.current, 6);
+        for (let i = 0; i < k; i++) add.push({ key: `ad-${G.current}-${curHand}-${i}`, back: ACTION_BACK, from,
+          to: { x: dr.left + dr.width * (0.3 + 0.4 * Math.random()), y: dr.top + dr.height / 2 }, delay: i * 70 });
+      }
+    }
+    prevDay.current = G.day; prevLine.current = G.line.length; prevHandLen.current = curHand;
+    if (add.length) setDeals(d => [...d, ...add]);
   });
 
   const locks = [];
-  if (judgeBlocks(G)) locks.push('⚖ Unpopular Judge — no actions this turn');
+  if (judgeBlocks(G)) locks.push('Unpopular Judge — no actions this turn');
   else {
-    if (G.actionBlocked) locks.push('💨 Rushed — no action, just collect');
-    if (callousActive(G)) locks.push('🛡 Callous Guards — line cards locked');
+    if (G.actionBlocked) locks.push('Rushed — no action, just collect');
+    if (callousActive(G)) locks.push('Callous Guards — line cards locked');
   }
 
   const pileStep = step && step.type === 'pileNoble' ? step.playerIdx : null;
@@ -401,32 +482,21 @@ function Board({ game }) {
       <main className="field">
         <div className="field-msg">
           <span className="message">{G.message}</span>
-          <span className="deck-counts">Nobles {G.nobleDeck.length} · Actions {G.actionDeck.length}</span>
+          <Decks G={G} />
         </div>
+        <TurnSteps G={G} />
         {locks.length > 0 && <div className="locks">{locks.map((l, i) => <span key={i} className="lock-chip">{l}</span>)}</div>}
 
-        <GuillotineLine G={G} step={step} onPick={game.pick} onInspect={onInspect} />
+        <GuillotineLine game={game} step={step} onPick={game.pick} onInspect={onInspect} targeting={targeting} drop={dropTick} hint={hintUids} />
 
-        <div className="controls">
-          {!targeting && (
-            <button className={'btn primary behead-btn' + (!G.cpu?.[G.current] && G.line.length > 0 ? ' pulse' : '')}
-              onClick={game.collectAndEnd}>
-              {G.line.length > 0 && <img className="behead-blade" src="/art/blade.svg" alt="" />}
-              {G.line.length === 0 ? 'End turn →' : 'Off with their head!'}
-            </button>
-          )}
-          {targeting && <button className="btn" onClick={game.cancelTarget}>Cancel</button>}
-          {game.canUndo() && <button className="btn" onClick={game.undo}>↶ Undo</button>}
-        </div>
-
-        <HandDock game={game} onInspect={onInspect} />
+        <HandDock game={game} onInspect={onInspect} onHint={setHintUids} />
       </main>
 
       <aside className="hud2">
         <div className="hud-top">
           <span className="day-chip">Day {G.day} / 3</span>
           <span className="hud-nav">
-            <button className="nav-btn" onClick={game.restart} title="New game">⟳</button>
+            <button className="nav-btn" onClick={game.restart} title="New game">↻</button>
             <SoundToggle />
           </span>
         </div>
@@ -466,6 +536,7 @@ function Board({ game }) {
       )}
 
       <div className="fx-layer">
+        {deals.map(d => <DealFlier key={d.key} deal={d} onDone={() => setDeals(x => x.filter(y => y.key !== d.key))} />)}
         {splats.map(s => <BloodSplatter key={s.key} splat={s} onDone={() => setSplats(x => x.filter(y => y.key !== s.key))} />)}
         {fliers.map(f => <SliceFlier key={f.key} flier={f} onDone={() => setFliers(x => x.filter(y => y.key !== f.key))} />)}
       </div>
@@ -492,11 +563,11 @@ function PlayerCard({ player, index, game, step, onInspect, onExpand }) {
       data-pile={index}
       onClick={() => (playerTarget ? game.pick({ playerIdx: index }) : onExpand(index))}>
       <div className="pc-head">
-        <span className="pc-name">{player.name}{G.cpu?.[index] ? ' 🤖' : ''}{isCurrent ? ' ◄' : ''}</span>
+        <span className="pc-name">{player.name}{G.cpu?.[index] && <span className="cpu-badge">CPU</span>}</span>
         <span className="pc-score"><ScoreDelta value={total} /><HeadScore value={total} /></span>
       </div>
       <div className="pc-stats">
-        <span title="cards in hand">🖐 {player.hand.length}</span>
+        <span className="pc-hand-ct" title="cards in hand"><CardsIcon className="pc-ico" /> {player.hand.length}</span>
         <span className="pc-heads-ct" title="heads collected">
           <HeadIcon color="var(--muted)" className="hc-small" /> {player.scorePile.length}
         </span>
@@ -505,7 +576,6 @@ function PlayerCard({ player, index, game, step, onInspect, onExpand }) {
             : colors.map(c => <BasketPip key={c} colorKey={c} count={tally[c]} title={FACTION[c].title} />)}
         </span>
       </div>
-      {isCurrent && <TurnSteps G={G} />}
       {player.frontCards.length > 0 && (
         <div className="pc-fronts">
           {player.frontCards.map(inst => {
@@ -518,7 +588,7 @@ function PlayerCard({ player, index, game, step, onInspect, onExpand }) {
                   title={`${def.name}\n${def.text}`}
                   onMouseEnter={(e) => onInspect(actionInspect(def, e.currentTarget))} onMouseLeave={() => onInspect(null)}
                   onClick={clickable ? (e) => { e.stopPropagation(); game.pick({ playerIdx: index, cardUid: inst.uid }); } : undefined} />
-                {canDiscard && <button className="discard-x" onClick={(e) => { e.stopPropagation(); game.discardFront(inst.uid); }} title="Discard">✕</button>}
+                {canDiscard && <button className="discard-x" onClick={(e) => { e.stopPropagation(); game.discardFront(inst.uid); }} title="Discard">×</button>}
               </span>
             );
           })}
@@ -551,7 +621,8 @@ function TurnSteps({ G }) {
 }
 
 // ─── The line of nobles + the (top-down) guillotine ─────────────────────────
-function GuillotineLine({ G, step, onPick, onInspect }) {
+function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint }) {
+  const { G } = game;
   const scrollRef = useRef(null);
   const cardEls = useRef(new Map());
   const prevOffsets = useRef(new Map());
@@ -592,7 +663,7 @@ function GuillotineLine({ G, step, onPick, onInspect }) {
             <button key={inst.uid}
               ref={el => { if (el) cardEls.current.set(inst.uid, el); else cardEls.current.delete(inst.uid); }}
               data-line-uid={inst.uid}
-              className={'noble-card token' + (idx === 0 ? ' front' : '') + (isCand && ordPos < 0 ? ' candidate' : '')}
+              className={'noble-card token' + (idx === 0 ? ' front' : '') + (isCand && ordPos < 0 ? ' candidate' : '') + (hint?.has(inst.uid) ? ' affected' : '')}
               style={{ borderColor: COLOR_HEX[def.color] }}
               onClick={() => isCand && ordPos < 0 && onPick({ idx })}
               onMouseEnter={(e) => onInspect(nobleInspect(def, e.currentTarget))}
@@ -605,13 +676,26 @@ function GuillotineLine({ G, step, onPick, onInspect }) {
           );
         })}
       </div>
-      <Guillotine />
+      <div className="guillo-col">
+        <Guillotine drop={drop} />
+        <div className="guillo-actions">
+          {!targeting && !G.actionPlayed && !G.cpu?.[G.current] && (
+            <button className={'btn primary behead-btn' + (G.line.length > 0 ? ' pulse' : '')}
+              onClick={game.collectAndEnd}>
+              {G.line.length > 0 && <img className="behead-blade" src="/art/blade.svg" alt="" />}
+              <span>{G.line.length === 0 ? 'End turn →' : 'Off with their head!'}</span>
+            </button>
+          )}
+          {targeting && <button className="btn" onClick={game.cancelTarget}>Cancel</button>}
+          {game.canUndo() && <button className="btn undo-btn" onClick={game.undo}>↶ Undo</button>}
+        </div>
+      </div>
     </div>
   );
 }
 
-// A detailed guillotine on a stepped platform, facing the line (stairs on the left).
-function Guillotine() {
+// A detailed guillotine on a stepped platform; the blade drops on each behead.
+function Guillotine({ drop = 0 }) {
   return (
     <div className="guillo-wrap" title="The guillotine — the next head drops here">
       <svg className="guillo" viewBox="0 0 132 158" aria-label="guillotine">
@@ -642,18 +726,18 @@ function Guillotine() {
         <rect x="88" y="12" width="11" height="108" rx="1" fill="#44321f" stroke="#2c2015" strokeWidth="1" />
         {/* top crossbeam */}
         <rect x="44" y="6" width="61" height="13" rx="2" fill="#4f3a26" stroke="#2c2015" strokeWidth="1" />
-        {/* rope */}
-        <line x1="74" y1="18" x2="74" y2="28" stroke="#caa66a" strokeWidth="1.6" />
-        {/* angled blade (metallic) */}
-        <polygon points="52,44 97,44 97,60 52,66" fill="url(#guilloMetal)" stroke="#5c6165" strokeWidth="0.6" />
-        <polygon points="52,60 97,55 97,60 52,66" fill="url(#guilloEdge)" opacity=".85" />
-        {/* wooden stock (mouton) with gold rivets */}
-        <rect x="47" y="28" width="54" height="17" rx="2" fill="#774c00" stroke="#3f2f22" strokeWidth="0.8" />
-        <rect x="50" y="30" width="48" height="13" rx="1.5" fill="#4c3612" />
-        <circle cx="58" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
-        <circle cx="70" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
-        <circle cx="82" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
-        <circle cx="94" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
+        {/* carriage: rope + metallic blade + wooden stock with rivets — drops on behead */}
+        <g className="guillo-blade" key={drop}>
+          <line x1="74" y1="10" x2="74" y2="28" stroke="#caa66a" strokeWidth="1.6" />
+          <polygon points="52,44 97,44 97,60 52,66" fill="url(#guilloMetal)" stroke="#5c6165" strokeWidth="0.6" />
+          <polygon points="52,60 97,55 97,60 52,66" fill="url(#guilloEdge)" opacity=".85" />
+          <rect x="47" y="28" width="54" height="17" rx="2" fill="#774c00" stroke="#3f2f22" strokeWidth="0.8" />
+          <rect x="50" y="30" width="48" height="13" rx="1.5" fill="#4c3612" />
+          <circle cx="58" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
+          <circle cx="70" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
+          <circle cx="82" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
+          <circle cx="94" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
+        </g>
         {/* lunette — the neck hole */}
         <circle cx="74.5" cy="96" r="12" fill="#17110c" />
         <path d="M63 96a11.5 11.5 0 0 1 23 0" fill="none" stroke="#c6a765" strokeWidth="3" />
@@ -667,10 +751,26 @@ function Guillotine() {
   );
 }
 
+// ─── The two draw piles (nobles + actions), cards deal out from here ─────────
+function Decks({ G }) {
+  return (
+    <div className="decks">
+      <div className="deck" data-deck="noble" title="Noble draw pile">
+        <span className="deck-stack"><img src={NOBLE_BACK} alt="" /><span className="deck-ct">{G.nobleDeck.length}</span></span>
+        <span className="deck-label">Nobles</span>
+      </div>
+      <div className="deck" data-deck="action" title="Action draw pile">
+        <span className="deck-stack"><img src={ACTION_BACK} alt="" /><span className="deck-ct">{G.actionDeck.length}</span></span>
+        <span className="deck-label">Actions</span>
+      </div>
+    </div>
+  );
+}
+
 // ─── The logged-in player's action-card hand ────────────────────────────────
-function HandDock({ game, onInspect }) {
+function HandDock({ game, onInspect, onHint }) {
   const { G } = game;
-  if (G.cpu?.[G.current]) return <div className="hand-dock cpu">🤖 {G.players[G.current].name} is thinking…</div>;
+  if (G.cpu?.[G.current]) return <div className="hand-dock cpu">{G.players[G.current].name} is thinking…</div>;
   const hand = G.players[G.current].hand;
   const n = hand.length;
   return (
@@ -682,8 +782,8 @@ function HandDock({ game, onInspect }) {
           <button key={inst.uid} className={'dock-card' + (playable ? ' playable' : '')}
             style={{ '--i': hi - (n - 1) / 2 }}
             onClick={() => playable && game.playCard(hi)}
-            onMouseEnter={(e) => onInspect({ ...actionInspect(def, e.currentTarget), onPlay: playable ? () => game.playCard(hi) : null })}
-            onMouseLeave={() => onInspect(null)}
+            onMouseEnter={(e) => { onInspect({ ...actionInspect(def, e.currentTarget), onPlay: playable ? () => game.playCard(hi) : null }); onHint && onHint(playable ? affectedLineUids(def, G) : null); }}
+            onMouseLeave={() => { onInspect(null); onHint && onHint(null); }}
             title={`${def.name}\n${def.text}`}>
             <img src={actionImg(def.id)} alt={def.name} />
           </button>
@@ -698,10 +798,11 @@ function NoblePileModal({ G, index, game, step, onInspect, forced, close }) {
   const player = G.players[index];
   const { total, lines } = computeScore(player);
   const pileTarget = step && step.type === 'pileNoble' && step.playerIdx === index;
+  const poss = player.name === 'You' ? 'Your heads' : `${player.name}'s heads`;
   return (
     <div className="modal-backdrop" onClick={close}>
       <div className="modal pile-modal" onClick={e => e.stopPropagation()}>
-        <p className="modal-title">{player.name}'s heads — {total} pts{pileTarget ? ' · choose one to take' : ''}</p>
+        <p className="modal-title">{poss} — {total} pts{pileTarget ? ' · choose one to take' : ''}</p>
         <div className="pile-grid">
           {player.scorePile.length === 0 && <span className="muted">No heads yet.</span>}
           {player.scorePile.map((inst, pi) => {
@@ -731,7 +832,7 @@ function HoverCard({ inspect, onKeep, onClose }) {
   if (!inspect) return null;
   const { img, name, faction, factionName, text, color, onPlay } = inspect;
   return (
-    <div className="hovercard center" onMouseEnter={onKeep} onMouseLeave={onClose}>
+    <div className="hovercard center" onMouseEnter={onKeep} onMouseMove={onKeep} onMouseLeave={onClose}>
       <div className="hc-imgwrap">
         <img className="hc-img" src={img} alt={name} style={{ borderColor: color }} />
         {faction && <img className="hc-emblem" src={`/art/symbol-${faction}.svg`} alt={factionName} title={factionName} />}
@@ -783,6 +884,8 @@ function MusicPlayer() {
     return () => window.removeEventListener('pointerdown', start);
   }, []);
 
+  const [cur, setCur] = useState(0);
+  const [dur, setDur] = useState(0);
   const toggle = () => {
     const a = audioRef.current;
     if (!a) return;
@@ -790,23 +893,44 @@ function MusicPlayer() {
     else { a.play().then(() => setPlaying(true)).catch(() => {}); }
   };
   const next = () => setIdx(i => (i + 1) % TRACKS.length);
+  const prev = () => setIdx(i => (i - 1 + TRACKS.length) % TRACKS.length);
+  const seek = (e) => { const a = audioRef.current; const t = parseFloat(e.target.value); if (a) { a.currentTime = t; setCur(t); } };
+  const pct = dur ? (cur / dur) * 100 : 0;
   return (
     <div className="music-player">
-      <audio ref={audioRef} onEnded={next} />
-      <button className="mp-btn" onClick={toggle} title={playing ? 'Pause' : 'Play'}>{playing ? '⏸' : '▶'}</button>
-      <button className="mp-btn" onClick={next} title="Next track">⏭</button>
-      <span className="mp-name">♪ {TRACKS[idx].name}</span>
+      <audio ref={audioRef} onEnded={next}
+        onTimeUpdate={e => setCur(e.target.currentTime)}
+        onLoadedMetadata={e => setDur(e.target.duration || 0)} />
+      <div className="mp-controls">
+        <button className="mp-btn" onClick={prev} title="Previous"><NextIcon className="mp-ico flip" /></button>
+        <button className="mp-btn mp-play" onClick={toggle} title={playing ? 'Pause' : 'Play'}>{playing ? <PauseIcon className="mp-ico" /> : <PlayIcon className="mp-ico" />}</button>
+        <button className="mp-btn" onClick={next} title="Next"><NextIcon className="mp-ico" /></button>
+      </div>
+      <div className="mp-main">
+        <span className="mp-name">{TRACKS[idx].name}</span>
+        <div className="mp-seekrow">
+          <span className="mp-time">{fmtTime(cur)}</span>
+          <input className="mp-seek" type="range" min="0" max={dur || 0} step="0.1" value={cur}
+            onChange={seek} style={{ '--pct': pct + '%' }} title="Seek" />
+          <span className="mp-time">{fmtTime(dur)}</span>
+        </div>
+      </div>
       <input className="mp-vol" type="range" min="0" max="1" step="0.05" value={vol}
-        onChange={e => setVol(parseFloat(e.target.value))} title="Music volume" />
+        onChange={e => setVol(parseFloat(e.target.value))} title="Volume" />
     </div>
   );
+}
+function fmtTime(t) {
+  if (!isFinite(t) || t < 0) return '0:00';
+  const m = Math.floor(t / 60), s = Math.floor(t % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function SoundToggle() {
   const [muted, setMuted] = useState(isMuted());
   return (
     <button className="sound-toggle nav-btn" title={muted ? 'Unmute SFX' : 'Mute SFX'}
-      onClick={() => setMuted(toggleMuted())}>{muted ? '🔇' : '🔊'}</button>
+      onClick={() => setMuted(toggleMuted())}><SpeakerIcon muted={muted} className="nav-ico" /></button>
   );
 }
 
@@ -841,7 +965,11 @@ function HelpSheet({ close, reduce, setReduce }) {
           <p>The day ends when the line is empty; a fresh 12 nobles come out. After day 3, most points wins.</p>
           <p className="help-factions"><b>Factions (noble colours):</b></p>
           <div className="help-legend">
-            <span>✝ Clergy</span><span>⚖ Judiciary</span><span>⚒ Common folk</span><span>⚔ Military</span><span>♛ Royalty</span>
+            <span><img className="leg-emblem" src="/art/symbol-blue.svg" alt="" /> Clergy</span>
+            <span><img className="leg-emblem" src="/art/symbol-green.svg" alt="" /> Judiciary</span>
+            <span><img className="leg-emblem" src="/art/symbol-gray.svg" alt="" /> Common folk</span>
+            <span><img className="leg-emblem" src="/art/symbol-red.svg" alt="" /> Military</span>
+            <span><img className="leg-emblem" src="/art/symbol-purple.svg" alt="" /> Royalty</span>
           </div>
           <p className="muted small">Watch for combos: Count + Countess, stacking Palace Guards, and negative "good-guy" nobles (Hero, Tragic Figure). Hover any card to see it big.</p>
           <label className="help-toggle">
@@ -877,7 +1005,7 @@ function BugReport({ game }) {
   };
   return (
     <>
-      <button className="bug-fab" title="Report a bug" onClick={() => { setOpen(true); setStatus(null); }}>🐞</button>
+      <button className="bug-fab" title="Report a bug" onClick={() => { setOpen(true); setStatus(null); }}><BugIcon className="bug-ico" /></button>
       {open && (
         <div className="modal-backdrop" onClick={() => setOpen(false)}>
           <div className="modal bug-modal" onClick={e => e.stopPropagation()}>
