@@ -3,7 +3,7 @@ import './App.css';
 import { useGame } from './hooks/useGame';
 import {
   NOBLE_BY_ID, ACTION_BY_ID, COLOR_HEX, COLORS,
-  nobleImg, actionImg, ACTION_BACK,
+  nobleImg, actionImg,
 } from './data/cards';
 import { computeScore } from './utils/scoring';
 import { judgeBlocks, callousActive } from './utils/effects';
@@ -14,8 +14,7 @@ export default function App() {
   const game = useGame();
   const { G } = game;
 
-  // No handoff screen for now — advance straight into the next turn (keeps the
-  // board mounted across turns so the day banner doesn't replay each turn).
+  // No handoff screen for now — advance straight into the next turn.
   useEffect(() => {
     if (G.phase === 'pass') {
       const t = setTimeout(() => game.advanceFromPass(), 0);
@@ -23,7 +22,7 @@ export default function App() {
     }
   }, [G.phase, G.current, G.day]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Drive computer players: when it's a CPU's turn, take it after a beat.
+  // Drive computer players.
   useEffect(() => {
     if (G.phase !== 'playing' || !G.cpu?.[G.current]) return;
     const t = setTimeout(() => game.cpuTurn(), 850);
@@ -45,8 +44,8 @@ export default function App() {
 }
 
 const MODES = {
-  solo:    { label: 'Solo — you + 2 CPU',   cpu: [false, true, true],  names: ['You', 'CPU 1', 'CPU 2'] },
-  duo:     { label: '2 Players + 1 CPU',    cpu: [false, false, true], names: ['Player 1', 'Player 2', 'CPU'] },
+  solo:    { label: 'Solo — you + 2 CPU',   cpu: [false, true, true],   names: ['You', 'CPU 1', 'CPU 2'] },
+  duo:     { label: '2 Players + 1 CPU',    cpu: [false, false, true],  names: ['Player 1', 'Player 2', 'CPU'] },
   hotseat: { label: '3 Players (hotseat)',  cpu: [false, false, false], names: ['Player 1', 'Player 2', 'Player 3'] },
 };
 
@@ -54,22 +53,16 @@ function StartScreen({ onStart }) {
   const [mode, setMode] = useState('solo');
   const [names, setNames] = useState(MODES.solo.names);
   const cpu = MODES[mode].cpu;
-
   const pickMode = (m) => { setMode(m); setNames(MODES[m].names); };
-
   return (
     <div className="screen center">
       <h2>Guillotine</h2>
       <p className="muted">Most heads after 3 days wins.</p>
-
       <div className="mode-pick">
         {Object.entries(MODES).map(([k, m]) => (
-          <button key={k} className={'mode-btn' + (mode === k ? ' on' : '')} onClick={() => pickMode(k)}>
-            {m.label}
-          </button>
+          <button key={k} className={'mode-btn' + (mode === k ? ' on' : '')} onClick={() => pickMode(k)}>{m.label}</button>
         ))}
       </div>
-
       <div className="name-inputs">
         {names.map((n, i) => (
           <label key={i} className="name-row">
@@ -79,20 +72,7 @@ function StartScreen({ onStart }) {
           </label>
         ))}
       </div>
-
       <button className="btn primary" onClick={() => onStart(names, cpu)}>Start Game</button>
-    </div>
-  );
-}
-
-function PassScreen({ G, onContinue }) {
-  const name = G.players[G.current].name;
-  return (
-    <div className="screen center">
-      <div className="day-chip">Day {G.day} / 3</div>
-      <h2>Pass to {name}</h2>
-      <p className="muted">Everyone else, look away.</p>
-      <button className="btn primary" onClick={onContinue}>{name}, I'm ready</button>
     </div>
   );
 }
@@ -125,19 +105,18 @@ function Board({ game }) {
   const targeting = G.phase === 'targeting';
   const step = game.step();
   const [inspect, setInspect] = useState(null);
+  const [expanded, setExpanded] = useState(null);
   const [fliers, setFliers] = useState([]);
   const [splats, setSplats] = useState([]);
   const seen = useRef(0);
   const lineRects = useRef({});
 
-  // Diff new log entries → spawn a slice + blood splatter for each beheading.
-  // Declared BEFORE the capture effect so it reads the PREVIOUS render's rects
-  // (the collected card is already gone from the DOM this render).
+  // Diff new log entries → a slice + blood splatter for each beheading.
   useLayoutEffect(() => {
     const fresh = G.log.filter(l => l.id > seen.current);
     if (!fresh.length) return;
     seen.current = Math.max(seen.current, ...fresh.map(l => l.id));
-    const newFliers = [], newSplats = [];
+    const nf = [], ns = [];
     for (const e of fresh) {
       if (e.kind !== 'collect') continue;
       playBehead();
@@ -146,16 +125,14 @@ function Board({ game }) {
       if (!from || !pile) continue;
       const p = pile.getBoundingClientRect();
       const fromPt = { x: from.left + from.width / 2, y: from.top + from.height / 2 };
-      newFliers.push({ key: e.id, uid: e.uid, defId: e.defId, from: fromPt,
-        to: { x: p.left + 28, y: p.top + 34 } });
-      newSplats.push({ key: e.id, x: fromPt.x + (Math.random() * 120 - 60),
-        y: fromPt.y + (Math.random() * 90 - 30), scale: 0.9 + Math.random() * 0.7 });
+      nf.push({ key: e.id, uid: e.uid, defId: e.defId, from: fromPt, to: { x: p.left + p.width / 2, y: p.top + p.height / 2 } });
+      ns.push({ key: e.id, x: fromPt.x + (Math.random() * 120 - 60), y: fromPt.y + (Math.random() * 90 - 30), scale: 0.85 + Math.random() * 0.7 });
     }
-    if (newFliers.length) setFliers(f => [...f, ...newFliers]);
-    if (newSplats.length) setSplats(s => [...s, ...newSplats]);
+    if (nf.length) setFliers(f => [...f, ...nf]);
+    if (ns.length) setSplats(s => [...s, ...ns]);
   });
 
-  // Capture current line-card screen positions every render.
+  // Capture current line-token positions every render (for the fly-from point).
   useLayoutEffect(() => {
     const map = {};
     document.querySelectorAll('.noble-card[data-line-uid]').forEach(el => {
@@ -165,84 +142,163 @@ function Board({ game }) {
   });
 
   const locks = [];
-  if (judgeBlocks(G)) locks.push('⚖ Unpopular Judge at the front — no action cards this turn.');
+  if (judgeBlocks(G)) locks.push('⚖ Unpopular Judge — no actions this turn');
   else {
-    if (G.actionBlocked) locks.push('💨 Rushed — no action this turn, just collect.');
-    if (callousActive(G)) locks.push('🛡 Callous Guards — line-altering cards are locked.');
+    if (G.actionBlocked) locks.push('💨 Rushed — no action, just collect');
+    if (callousActive(G)) locks.push('🛡 Callous Guards — line cards locked');
   }
 
+  const pileStep = step && step.type === 'pileNoble' ? step.playerIdx : null;
+  const showPile = expanded != null ? expanded : pileStep;
+
   return (
-    <div className="board">
-      <div className="board-main">
-        <div className="hud">
+    <div className="board2">
+      <aside className="hud2">
+        <div className="hud-top">
           <span className="day-chip">Day {G.day} / 3</span>
+          <span className="hud-nav">
+            <button className="nav-btn" onClick={game.restart} title="New game">⟳</button>
+            <SoundToggle />
+          </span>
+        </div>
+        {G.players.map((p, i) => (
+          <PlayerCard key={i} player={p} index={i} game={game} step={step}
+            onInspect={setInspect} onExpand={setExpanded} />
+        ))}
+        <LogPanel log={G.log} />
+      </aside>
+
+      <main className="field">
+        <div className="field-msg">
           <span className="message">{G.message}</span>
           <span className="deck-counts">Nobles {G.nobleDeck.length} · Actions {G.actionDeck.length}</span>
-          <SoundToggle />
         </div>
+        {locks.length > 0 && <div className="locks">{locks.map((l, i) => <span key={i} className="lock-chip">{l}</span>)}</div>}
 
-        {locks.length > 0 && (
-          <div className="locks">{locks.map((l, i) => <span key={i} className="lock-chip">{l}</span>)}</div>
-        )}
-
-        <LineArea G={G} step={step} onPick={game.pick} onInspect={setInspect} />
+        <GuillotineLine G={G} step={step} onPick={game.pick} onInspect={setInspect} />
 
         <div className="controls">
           {!targeting && (
             <button className="btn primary" onClick={game.collectAndEnd}>
-              {G.line.length === 0 ? 'End turn →' : 'Collect front noble →'}
+              {G.line.length === 0 ? 'End turn →' : 'Collect head →'}
             </button>
           )}
           {targeting && <button className="btn" onClick={game.cancelTarget}>Cancel</button>}
         </div>
 
-        <div className="players">
-          {G.players.map((p, i) => (
-            <PlayerPanel key={i} player={p} index={i} game={game} step={step} onInspect={setInspect} />
-          ))}
-        </div>
-
-        <LogPanel log={G.log} />
-      </div>
+        <HandDock game={game} onInspect={setInspect} />
+      </main>
 
       <InspectorPane inspect={inspect} />
 
-      {step && step.type === 'noblePick' &&
+      {showPile != null && (
+        <NoblePileModal G={G} index={showPile} game={game} step={step} onInspect={setInspect}
+          forced={pileStep === showPile}
+          close={() => { if (pileStep === showPile) game.cancelTarget(); setExpanded(null); }} />
+      )}
+
+      {step?.type === 'handCard' && (
+        <PickModal title={G.message} cancel={game.cancelTarget}
+          cards={G.players[step.playerIdx].hand.map((inst, hi) => {
+            const def = ACTION_BY_ID[inst.defId];
+            return { key: inst.uid, img: actionImg(def.id), name: def.name, onClick: () => game.pick({ idx: hi }) };
+          })} />
+      )}
+      {step?.type === 'noblePick' && (
         <PickModal title={G.message} cancel={game.cancelTarget}
           cards={step.options.map(o => ({ key: o.uid, img: nobleImg(NOBLE_BY_ID[o.defId].id),
-            name: NOBLE_BY_ID[o.defId].name, color: NOBLE_BY_ID[o.defId].color,
-            onClick: () => game.pick({ uid: o.uid }) }))} />}
-
-      {step && step.type === 'actionDiscardPick' &&
+            name: NOBLE_BY_ID[o.defId].name, color: NOBLE_BY_ID[o.defId].color, onClick: () => game.pick({ uid: o.uid }) }))} />
+      )}
+      {step?.type === 'actionDiscardPick' && (
         <PickModal title={G.message} cancel={game.cancelTarget}
           cards={step.candidates.map(idx => {
             const inst = G.actionDiscard[idx]; const def = ACTION_BY_ID[inst.defId];
-            return { key: inst.uid, img: actionImg(def.id), name: def.name,
-              onClick: () => game.pick({ idx }) };
-          })} />}
+            return { key: inst.uid, img: actionImg(def.id), name: def.name, onClick: () => game.pick({ idx }) };
+          })} />
+      )}
 
       <div className="fx-layer">
-        {splats.map(s => <BloodSplatter key={s.key} splat={s}
-          onDone={() => setSplats(x => x.filter(y => y.key !== s.key))} />)}
-        {fliers.map(f => <SliceFlier key={f.key} flier={f}
-          onDone={() => setFliers(x => x.filter(y => y.key !== f.key))} />)}
+        {splats.map(s => <BloodSplatter key={s.key} splat={s} onDone={() => setSplats(x => x.filter(y => y.key !== s.key))} />)}
+        {fliers.map(f => <SliceFlier key={f.key} flier={f} onDone={() => setFliers(x => x.filter(y => y.key !== f.key))} />)}
       </div>
       <DayBanner day={G.day} />
     </div>
   );
 }
 
-function LineArea({ G, step, onPick, onInspect }) {
+// ─── Corner HUD player card ─────────────────────────────────────────────────
+function PlayerCard({ player, index, game, step, onInspect, onExpand }) {
+  const { G } = game;
+  const isCurrent = index === G.current && (G.phase === 'playing' || G.phase === 'targeting');
+  const { total } = computeScore(player);
+  const playerTarget = step && step.type === 'player' && step.candidates.includes(index);
+  const frontTarget = step && step.type === 'frontCard';
+
+  const tally = {};
+  player.scorePile.forEach(inst => { const c = NOBLE_BY_ID[inst.defId].color; tally[c] = (tally[c] || 0) + 1; });
+  const colors = Object.keys(tally);
+
+  return (
+    <div className={'pcard' + (isCurrent ? ' active' : '') + (playerTarget ? ' selectable' : '')}
+      data-pile={index}
+      onClick={() => (playerTarget ? game.pick({ playerIdx: index }) : onExpand(index))}>
+      <div className="pc-head">
+        <span className="pc-name">{player.name}{G.cpu?.[index] ? ' 🤖' : ''}{isCurrent ? ' ◄' : ''}</span>
+        <span className="pc-score"><ScoreDelta value={total} />{total}</span>
+      </div>
+      <div className="pc-stats">
+        <span title="cards in hand">🖐 {player.hand.length}</span>
+        <span title="heads collected">🗡 {player.scorePile.length}</span>
+        <span className="pc-tally">
+          {colors.length === 0 ? <span className="muted small">no heads</span>
+            : colors.map(c => <span key={c} className="pip" style={{ background: COLOR_HEX[c] }} title={COLORS[c]}>{tally[c]}</span>)}
+        </span>
+      </div>
+      {isCurrent && <TurnSteps G={G} />}
+      {player.frontCards.length > 0 && (
+        <div className="pc-fronts">
+          {player.frontCards.map(inst => {
+            const def = ACTION_BY_ID[inst.defId];
+            const clickable = frontTarget && step.candidates.some(c => c.cardUid === inst.uid);
+            const canDiscard = isCurrent && G.phase === 'playing' && def.params?.kind === 'callousGuards';
+            return (
+              <span key={inst.uid} className="front-wrap">
+                <img className={'pc-front' + (clickable ? ' clickable' : '')} src={actionImg(def.id)} alt={def.name}
+                  title={`${def.name}\n${def.text}`}
+                  onMouseEnter={() => onInspect(actionInspect(def))} onMouseLeave={() => onInspect(null)}
+                  onClick={clickable ? (e) => { e.stopPropagation(); game.pick({ playerIdx: index, cardUid: inst.uid }); } : undefined} />
+                {canDiscard && <button className="discard-x" onClick={(e) => { e.stopPropagation(); game.discardFront(inst.uid); }} title="Discard">✕</button>}
+              </span>
+            );
+          })}
+        </div>
+      )}
+      <div className="pc-expand">view heads ▾</div>
+    </div>
+  );
+}
+
+function TurnSteps({ G }) {
+  const cur = G.phase === 'targeting' ? 0 : (G.actionPlayed ? 1 : 0);
+  return (
+    <div className="turn-steps">
+      {['Action', 'Collect', 'Draw'].map((s, i) => (
+        <span key={s} className={'tstep' + (i === cur ? ' on' : '') + (i < cur ? ' done' : '')}>{s}</span>
+      ))}
+    </div>
+  );
+}
+
+// ─── The line of nobles + the (top-down) guillotine ─────────────────────────
+function GuillotineLine({ G, step, onPick, onInspect }) {
   const scrollRef = useRef(null);
   const cardEls = useRef(new Map());
   const prevOffsets = useRef(new Map());
   const reorder = step && step.type === 'reorder';
   const lineTarget = step && (step.type === 'lineNoble' || step.type === 'reorder');
   const order = reorder ? G.pending.order : [];
-  // back of line on the left, front (next to collect) on the right by the guillotine
   const display = G.line.map((inst, idx) => ({ inst, idx })).reverse();
 
-  // FLIP: animate cards sliding to their new slots when the line reorders.
   useLayoutEffect(() => {
     const next = new Map();
     cardEls.current.forEach((el, uid) => { if (el) next.set(uid, { l: el.offsetLeft, t: el.offsetTop }); });
@@ -251,15 +307,12 @@ function LineArea({ G, step, onPick, onInspect }) {
       const el = cardEls.current.get(uid);
       if (!prev || !el) return;
       const dx = prev.l - pos.l, dy = prev.t - pos.t;
-      if (dx || dy) el.animate(
-        [{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'translate(0,0)' }],
+      if (dx || dy) el.animate([{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'translate(0,0)' }],
         { duration: 340, easing: 'cubic-bezier(.45,0,.35,1)' });
     });
     prevOffsets.current = next;
   }, [G.line]);
 
-  // Keep the front of the line in view — but not while targeting (a candidate
-  // near the back must stay reachable; don't yank the scroll out from under it).
   useEffect(() => {
     if (G.phase === 'targeting') return;
     const el = scrollRef.current;
@@ -278,125 +331,102 @@ function LineArea({ G, step, onPick, onInspect }) {
             <button key={inst.uid}
               ref={el => { if (el) cardEls.current.set(inst.uid, el); else cardEls.current.delete(inst.uid); }}
               data-line-uid={inst.uid}
-              className={'noble-card' + (idx === 0 ? ' front' : '') + (isCand && ordPos < 0 ? ' candidate' : '')}
+              className={'noble-card token' + (idx === 0 ? ' front' : '') + (isCand && ordPos < 0 ? ' candidate' : '')}
               style={{ borderColor: COLOR_HEX[def.color] }}
               onClick={() => isCand && ordPos < 0 && onPick({ idx })}
               onMouseEnter={() => onInspect(nobleInspect(def))}
               onMouseLeave={() => onInspect(null)}
-              title={`${def.name} — ${COLORS[def.color]}${def.text ? `\n${def.text}` : ''}`}>
+              title={`${def.name} — ${COLORS[def.color]}`}>
               <img src={nobleImg(def.id)} alt={def.name} />
-              {idx === 0 && ordPos < 0 && <span className="front-tag">NEXT ▶</span>}
+              {idx === 0 && ordPos < 0 && <span className="front-tag">NEXT</span>}
               {ordPos >= 0 && <span className="order-tag">{ordPos + 1}</span>}
             </button>
           );
         })}
       </div>
-      <div className="guillotine" title="The guillotine — front of the line">
-        <div className="g-frame"><div className="g-blade" /></div>
-        <span>GUILLOTINE</span>
-      </div>
+      <Guillotine />
     </div>
   );
 }
 
-function PlayerPanel({ player, index, game, step, onInspect }) {
-  const { G } = game;
-  const [showBreakdown, setShowBreakdown] = useState(false);
-  const isCurrent = index === G.current && (G.phase === 'playing' || G.phase === 'targeting');
-  const { total, lines } = computeScore(player);
-
-  const playerTarget = step && step.type === 'player' && step.candidates.includes(index);
-  const pileTarget = step && step.type === 'pileNoble' && step.playerIdx === index;
-  const handTarget = step && step.type === 'handCard' && step.playerIdx === index;
-  const frontTarget = step && step.type === 'frontCard';
-  const frontHere = frontTarget ? step.candidates.filter(c => c.playerIdx === index) : [];
-
+function Guillotine() {
   return (
-    <div className={'player-panel' + (isCurrent ? ' active' : '') + (playerTarget ? ' selectable' : '')}
-      onClick={playerTarget ? () => game.pick({ playerIdx: index }) : undefined}>
-      <div className="panel-head">
-        <span className="pname">{player.name}{G.cpu?.[index] ? ' 🤖' : ''}{isCurrent ? ' ◄' : ''}</span>
-        <span className="pscore" onClick={(e) => { e.stopPropagation(); setShowBreakdown(v => !v); }}>
-          <ScoreDelta value={total} />
-          {total} pts ▾
-          {showBreakdown && (
-            <div className="breakdown" onClick={e => e.stopPropagation()}>
-              {lines.length === 0 && <div className="muted small">no points yet</div>}
-              {lines.map((l, i) => (
-                <div key={i} className="bd-row"><span>{l.label}</span><span>{l.value > 0 ? `+${l.value}` : l.value}</span></div>
-              ))}
-              <div className="bd-row total"><span>Total</span><span>{total}</span></div>
-            </div>
-          )}
-        </span>
-      </div>
+    <div className="guillo-wrap" title="The guillotine — next head drops here">
+      <svg className="guillo" viewBox="0 0 96 150" aria-label="guillotine">
+        <rect x="6" y="90" width="84" height="56" rx="3" fill="#5f5147" />
+        <line x1="48" y1="90" x2="48" y2="146" stroke="#4a3f36" strokeWidth="1.5" />
+        <rect x="6" y="90" width="84" height="56" rx="3" fill="none" stroke="#3d342c" strokeWidth="2" />
+        <rect x="12" y="6" width="14" height="128" rx="2" fill="#8d9398" stroke="#5c6165" strokeWidth="1.5" />
+        <rect x="70" y="6" width="14" height="128" rx="2" fill="#8d9398" stroke="#5c6165" strokeWidth="1.5" />
+        <rect x="8" y="2" width="80" height="16" rx="2" fill="#6c7175" stroke="#4e5256" strokeWidth="1.5" />
+        <rect x="30" y="20" width="36" height="16" fill="#9aa0a4" stroke="#6e7377" />
+        <polygon points="30,36 66,36 58,47 38,47" fill="#d2d6d9" stroke="#aeb3b6" />
+        <circle cx="48" cy="72" r="13" fill="#241a14" />
+        <path d="M35 72 a13 13 0 0 1 26 0" fill="none" stroke="#c6a765" strokeWidth="3" />
+        <path d="M35 72 a13 13 0 0 0 26 0" fill="none" stroke="#9c7d3e" strokeWidth="3" />
+        <circle cx="20" cy="44" r="3" fill="#7a3b1e" opacity=".5" />
+        <circle cx="78" cy="104" r="4" fill="#7a3b1e" opacity=".4" />
+        <circle cx="30" cy="120" r="2.5" fill="#7a3b1e" opacity=".4" />
+      </svg>
+      <span className="guillo-label">GUILLOTINE</span>
+    </div>
+  );
+}
 
-      <div className="pile" data-pile={index}>
-        {player.scorePile.length === 0 && <span className="muted small">no heads yet</span>}
-        {player.scorePile.map((inst, pi) => {
-          const def = NOBLE_BY_ID[inst.defId];
-          const clickable = pileTarget && step.candidates.includes(pi);
-          return <SlicedThumb key={inst.uid} defId={inst.defId} uid={inst.uid}
-            className={'thumb noble' + (clickable ? ' clickable' : '')}
-            title={`${def.name} (${COLORS[def.color]})`}
-            onMouseEnter={() => onInspect(nobleInspect(def))} onMouseLeave={() => onInspect(null)}
-            onClick={clickable ? (e) => { e.stopPropagation(); game.pick({ idx: pi }); } : undefined} />;
-        })}
-      </div>
+// ─── The logged-in player's action-card hand ────────────────────────────────
+function HandDock({ game, onInspect }) {
+  const { G } = game;
+  if (G.cpu?.[G.current]) return <div className="hand-dock cpu">🤖 {G.players[G.current].name} is thinking…</div>;
+  const hand = G.players[G.current].hand;
+  const n = hand.length;
+  return (
+    <div className="hand-dock">
+      {hand.map((inst, hi) => {
+        const def = ACTION_BY_ID[inst.defId];
+        const playable = game.canPlay(hi);
+        return (
+          <button key={inst.uid} className={'dock-card' + (playable ? ' playable' : '')}
+            style={{ '--i': hi - (n - 1) / 2 }}
+            onClick={() => playable && game.playCard(hi)}
+            onMouseEnter={() => onInspect(actionInspect(def))} onMouseLeave={() => onInspect(null)}
+            title={`${def.name}\n${def.text}`}>
+            <img src={actionImg(def.id)} alt={def.name} />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
-      {player.frontCards.length > 0 && (
-        <div className="fronts">
-          {player.frontCards.map(inst => {
-            const def = ACTION_BY_ID[inst.defId];
-            const clickable = frontHere.some(c => c.cardUid === inst.uid);
-            const canDiscard = isCurrent && G.phase === 'playing' && def.params?.kind === 'callousGuards';
-            return (
-              <span key={inst.uid} className="front-wrap">
-                <img className={'thumb action' + (clickable ? ' clickable' : '')} src={actionImg(def.id)}
-                  alt={def.name} title={`${def.name}\n${def.text}`}
-                  onMouseEnter={() => onInspect(actionInspect(def))} onMouseLeave={() => onInspect(null)}
-                  onClick={clickable ? (e) => { e.stopPropagation(); game.pick({ playerIdx: index, cardUid: inst.uid }); } : undefined} />
-                {canDiscard && <button className="discard-x" title="Discard Callous Guards"
-                  onClick={(e) => { e.stopPropagation(); game.discardFront(inst.uid); }}>✕</button>}
-              </span>
-            );
+// ─── Expandable view of a player's collected heads ──────────────────────────
+function NoblePileModal({ G, index, game, step, onInspect, forced, close }) {
+  const player = G.players[index];
+  const { total, lines } = computeScore(player);
+  const pileTarget = step && step.type === 'pileNoble' && step.playerIdx === index;
+  return (
+    <div className="modal-backdrop" onClick={close}>
+      <div className="modal pile-modal" onClick={e => e.stopPropagation()}>
+        <p className="modal-title">{player.name}'s heads — {total} pts{pileTarget ? ' · choose one to take' : ''}</p>
+        <div className="pile-grid">
+          {player.scorePile.length === 0 && <span className="muted">No heads yet.</span>}
+          {player.scorePile.map((inst, pi) => {
+            const def = NOBLE_BY_ID[inst.defId];
+            const clickable = pileTarget && step.candidates.includes(pi);
+            return <SlicedThumb key={inst.uid} defId={inst.defId} uid={inst.uid}
+              className={'pile-card' + (clickable ? ' clickable' : '')}
+              title={`${def.name} (${COLORS[def.color]})`}
+              onMouseEnter={() => onInspect(nobleInspect(def))} onMouseLeave={() => onInspect(null)}
+              onClick={clickable ? () => { game.pick({ idx: pi }); close(); } : undefined} />;
           })}
         </div>
-      )}
-
-      <div className="hand">
-        {isCurrent
-          ? player.hand.map((inst, hi) => <HandCard key={inst.uid} inst={inst} handIdx={hi} game={game} onInspect={onInspect} />)
-          : handTarget
-            ? player.hand.map((inst, hi) => {
-                const def = ACTION_BY_ID[inst.defId];
-                return <button key={inst.uid} className="hand-card small clickable"
-                  onClick={(e) => { e.stopPropagation(); game.pick({ idx: hi }); }}
-                  onMouseEnter={() => onInspect(actionInspect(def))} onMouseLeave={() => onInspect(null)}
-                  title={`${def.name}\n${def.text}`}>
-                  <img src={actionImg(def.id)} alt={def.name} />
-                </button>;
-              })
-            : <div className="hidden-hand">
-                {player.hand.map(inst => <img key={inst.uid} className="thumb back" src={ACTION_BACK} alt="card" />)}
-              </div>}
+        {lines.length > 0 && (
+          <div className="pile-breakdown">
+            {lines.map((l, i) => <div key={i} className="bd-row"><span>{l.label}</span><span>{l.value > 0 ? `+${l.value}` : l.value}</span></div>)}
+          </div>
+        )}
+        <button className="btn" onClick={close}>{forced ? 'Cancel' : 'Close'}</button>
       </div>
     </div>
-  );
-}
-
-function HandCard({ inst, handIdx, game, onInspect }) {
-  const { G } = game;
-  const def = ACTION_BY_ID[inst.defId];
-  const playable = game.canPlay(handIdx);
-  const selected = G.selectedIdx === handIdx;
-  return (
-    <button className={'hand-card' + (selected ? ' selected' : '') + (playable ? '' : ' locked')}
-      onClick={() => playable && game.playCard(handIdx)}
-      onMouseEnter={() => onInspect(actionInspect(def))} onMouseLeave={() => onInspect(null)}
-      title={`${def.name}\n${def.text}`}>
-      <img src={actionImg(def.id)} alt={def.name} />
-    </button>
   );
 }
 
@@ -405,15 +435,12 @@ function InspectorPane({ inspect }) {
     <div className={'inspector' + (inspect ? ' show' : '')}>
       {inspect ? (
         <>
-          <img className="inspect-img" src={inspect.img} alt={inspect.name}
-            style={{ borderColor: inspect.color }} />
+          <img className="inspect-img" src={inspect.img} alt={inspect.name} style={{ borderColor: inspect.color }} />
           <div className="inspect-name">{inspect.name}</div>
           <div className="inspect-sub" style={{ color: inspect.color }}>{inspect.sub}</div>
           {inspect.text && <div className="inspect-text">{inspect.text}</div>}
         </>
-      ) : (
-        <div className="inspect-hint">Hover a card to inspect it.</div>
-      )}
+      ) : <div className="inspect-hint">Hover a card to see it big.</div>}
     </div>
   );
 }
@@ -434,21 +461,16 @@ function MusicPlayer() {
   const [vol, setVol] = useState(() => {
     try { return parseFloat(localStorage.getItem('guillotine-music-vol') ?? '0.4'); } catch { return 0.4; }
   });
-
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = vol;
     try { localStorage.setItem('guillotine-music-vol', String(vol)); } catch { /* ignore */ }
   }, [vol]);
-
-  // Load (and continue playing) when the track changes.
   useEffect(() => {
     const a = audioRef.current;
     if (!a) return;
-    a.src = TRACKS[idx].src;
-    a.volume = vol;
+    a.src = TRACKS[idx].src; a.volume = vol;
     if (playing) a.play().catch(() => {});
   }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const toggle = () => {
     const a = audioRef.current;
     if (!a) return;
@@ -456,7 +478,6 @@ function MusicPlayer() {
     else { a.play().then(() => setPlaying(true)).catch(() => {}); }
   };
   const next = () => setIdx(i => (i + 1) % TRACKS.length);
-
   return (
     <div className="music-player">
       <audio ref={audioRef} onEnded={next} />
@@ -472,15 +493,13 @@ function MusicPlayer() {
 function SoundToggle() {
   const [muted, setMuted] = useState(isMuted());
   return (
-    <button className="sound-toggle" title={muted ? 'Unmute' : 'Mute'}
-      onClick={() => setMuted(toggleMuted())}>
-      {muted ? '🔇' : '🔊'}
-    </button>
+    <button className="sound-toggle nav-btn" title={muted ? 'Unmute SFX' : 'Mute SFX'}
+      onClick={() => setMuted(toggleMuted())}>{muted ? '🔇' : '🔊'}</button>
   );
 }
 
 function LogPanel({ log }) {
-  const recent = log.slice(-12).reverse();
+  const recent = log.slice(-10).reverse();
   return (
     <div className="log-panel">
       <div className="log-head">Game Log</div>

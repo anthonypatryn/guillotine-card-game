@@ -399,3 +399,115 @@
   background: var(--accent); color: #fff; font-size: 10px; font-weight: bold;
   padding: 2px 6px; border-radius: 4px; letter-spacing: .5px;
 }
+
+/* ===================================================================
+   Long Shot-style board redesign (overrides earlier board styles)
+   =================================================================== */
+.board2 {
+  flex: 1; display: grid;
+  grid-template-columns: 244px minmax(0, 1fr) 264px;
+  gap: 12px; padding: 12px; min-height: 0;
+  background-color: #24242a;
+  background-image: url('/cobble.svg');
+  background-size: 420px;
+}
+@media (max-width: 900px) {
+  .board2 { grid-template-columns: 1fr; }
+  .board2 .inspector { display: none; }
+}
+
+/* translucent panels floating on the cobbles */
+.hud2 {
+  display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: auto;
+  background: rgba(16, 11, 8, 0.86); border: 1px solid var(--panel-light);
+  border-radius: 12px; padding: 10px;
+}
+.hud-top { display: flex; align-items: center; justify-content: space-between; }
+.hud-nav { display: flex; gap: 6px; }
+.nav-btn {
+  background: var(--panel-light); border: 1px solid var(--panel-light); color: var(--ink);
+  border-radius: 6px; cursor: pointer; font-size: 15px; line-height: 1; padding: 5px 9px;
+}
+.nav-btn:hover { filter: brightness(1.25); }
+
+.field {
+  display: flex; flex-direction: column; gap: 10px; min-width: 0;
+  background: rgba(16, 11, 8, 0.5); border: 1px solid rgba(255,255,255,.05);
+  border-radius: 12px; padding: 12px;
+}
+.field-msg { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.field-msg .message { font-weight: bold; }
+.field-msg .deck-counts { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+/* inspector becomes a grid column */
+.board2 .inspector {
+  position: sticky; top: 12px; align-self: start; width: auto; flex: none;
+  background: rgba(16, 11, 8, 0.9);
+}
+
+/* ─── HUD player cards ─── */
+.pcard {
+  background: var(--panel); border: 2px solid var(--panel-light); border-radius: 10px;
+  padding: 8px 10px; cursor: pointer; transition: border-color .12s, box-shadow .12s;
+}
+.pcard:hover { border-color: var(--gold); }
+.pcard.active { border-color: var(--gold); box-shadow: 0 0 10px rgba(201,162,39,.4); }
+.pcard.selectable { border-color: var(--accent-bright); box-shadow: 0 0 12px rgba(231,76,60,.5); animation: pulse 1s infinite; }
+.pc-head { display: flex; align-items: center; justify-content: space-between; }
+.pc-name { font-weight: bold; font-size: 14px; }
+.pc-score { position: relative; background: var(--accent); color: #fff; font-weight: bold; padding: 2px 10px; border-radius: 12px; }
+.pc-stats { display: flex; align-items: center; gap: 10px; margin-top: 5px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.pc-tally { display: inline-flex; gap: 3px; margin-left: auto; }
+.pip {
+  min-width: 17px; height: 17px; border-radius: 4px; color: #fff; font-size: 11px; font-weight: bold;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0 3px;
+  text-shadow: 0 1px 1px rgba(0,0,0,.6); border: 1px solid rgba(0,0,0,.3);
+}
+.turn-steps { display: flex; gap: 4px; margin-top: 6px; }
+.tstep {
+  flex: 1; text-align: center; font-size: 10px; letter-spacing: .5px; padding: 2px 0;
+  border-radius: 4px; background: #15100c; color: var(--muted); border: 1px solid var(--panel-light);
+}
+.tstep.on { background: var(--gold); color: #1b1410; font-weight: bold; border-color: var(--gold); }
+.tstep.done { color: var(--ink); opacity: .6; }
+.pc-fronts { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; }
+.pc-front { width: 28px; height: 40px; border-radius: 3px; border: 2px solid #555; object-fit: cover; }
+.pc-front.clickable { outline: 2px solid var(--accent-bright); cursor: pointer; }
+.pc-expand { margin-top: 5px; font-size: 10px; color: var(--muted); text-align: right; }
+
+/* ─── Line of nobles (small tokens) + guillotine ─── */
+.line-area {
+  display: flex; align-items: stretch; gap: 8px; min-height: 120px;
+  background: rgba(0,0,0,.22); border: 1px solid rgba(255,255,255,.05); border-radius: 10px; padding: 10px;
+}
+.noble-card.token { width: 60px; height: 86px; border-width: 2px; }
+.noble-card.token .front-tag {
+  top: 0; left: 0; right: 0; font-size: 8px; padding: 1px 0; letter-spacing: .5px;
+}
+.noble-card.token .order-tag { width: 15px; height: 15px; font-size: 10px; }
+
+.guillo-wrap { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding-left: 6px; border-left: 2px dashed var(--accent); }
+.guillo { width: 72px; height: auto; filter: drop-shadow(0 3px 5px rgba(0,0,0,.6)); }
+.guillo-label { font-size: 9px; color: var(--accent-bright); font-weight: bold; letter-spacing: 1px; }
+
+/* ─── Hand dock (current player's action cards) ─── */
+.hand-dock {
+  display: flex; justify-content: center; align-items: flex-end; min-height: 150px; padding-top: 10px;
+}
+.hand-dock.cpu { color: var(--muted); font-style: italic; align-items: center; }
+.dock-card {
+  width: 92px; height: 132px; margin: 0 -10px; padding: 0; border: 2px solid var(--panel-light);
+  border-radius: 8px; background: #000; overflow: hidden; cursor: default;
+  transform: rotate(calc(var(--i) * 3deg)) translateY(calc(var(--i) * var(--i) * 1.5px));
+  transform-origin: bottom center; transition: transform .14s, box-shadow .14s, border-color .14s;
+}
+.dock-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.dock-card.playable { cursor: pointer; border-color: var(--gold); box-shadow: 0 0 10px rgba(201,162,39,.5); }
+.dock-card:hover { transform: rotate(0) translateY(-18px) scale(1.08); z-index: 5; }
+
+/* ─── Pile (heads) modal ─── */
+.pile-modal { max-width: min(92vw, 640px); }
+.pile-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-height: 48vh; overflow: auto; }
+.sliced-thumb.pile-card { width: 84px; height: 120px; }
+.sliced-thumb.pile-card.clickable { outline: 3px solid var(--accent-bright); cursor: pointer; }
+.pile-breakdown { width: 100%; max-width: 320px; border-top: 1px solid var(--panel-light); padding-top: 8px; }
