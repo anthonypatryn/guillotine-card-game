@@ -7,7 +7,8 @@ import { computeScore } from '../utils/scoring';
 import { getStep, applyResolved, canPlayCard, lineNobleCandidates } from '../utils/effects';
 import { moveNoble } from '../utils/line';
 
-const NUM_PLAYERS = 3;
+const NUM_PLAYERS = 3;        // default seats on the start screen
+const MIN_PLAYERS = 2, MAX_PLAYERS = 5;
 const NOBLES_PER_DAY = 12;
 const START_HAND = 5;
 const TOTAL_DAYS = 3;
@@ -33,6 +34,7 @@ function fresh() {
     firstPlayer: 0,
     day: 1,
     cpu: [false, false, false],   // which seats are computer-controlled
+    cpuLevel: [1, 1, 1],          // 0 Recrue · 1 Résistant · 2 Maquisard
     line: [],
     nobleDeck: [], nobleDiscard: [],
     actionDeck: [], actionDiscard: [],
@@ -59,24 +61,30 @@ export function useGame() {
   const past = useRef([]);                 // snapshots for Undo (this turn only)
   const snap = () => { past.current = [...past.current, gRef.current].slice(-20); };
 
-  const start = useCallback((names, cpu) => {
+  const start = useCallback((names, cpu, cpuLevel) => {
+    const n = Math.max(MIN_PLAYERS, Math.min(MAX_PLAYERS,
+      (cpu && cpu.length) || (names && names.length) || NUM_PLAYERS));
     let actionDeck = buildActionDeck();
     let actionDiscard = [];
-    const players = Array.from({ length: NUM_PLAYERS }, (_, i) =>
+    const players = Array.from({ length: n }, (_, i) =>
       blankPlayer((names && names[i]) || `Player ${i + 1}`));
-    for (let i = 0; i < NUM_PLAYERS; i++) {
+    for (let i = 0; i < n; i++) {
       const r = draw(actionDeck, actionDiscard, START_HAND);
       players[i].hand = r.drawn; actionDeck = r.deck; actionDiscard = r.disc;
     }
     const nd = draw(buildNobleDeck(), [], NOBLES_PER_DAY);
+    const fill = (src, dflt) => Array.from({ length: n }, (_, i) => (src && src[i] != null ? src[i] : dflt));
     setG({
       ...fresh(),
       phase: 'pass', players,
-      cpu: cpu || [false, false, false],
+      cpu: fill(cpu, false),
+      cpuLevel: fill(cpuLevel, 1),
+      skipAction: fill(null, false),
+      confusion: fill(null, false),
       line: nd.drawn, nobleDeck: nd.deck, nobleDiscard: nd.disc,
       actionDeck, actionDiscard,
       message: `Day 1 — pass to ${players[0].name}`,
-      log: [logEntry('day', '🏁 Game start — Day 1, 12 nobles in line.')],
+      log: [logEntry('day', `🏁 Game start — Day 1, ${n} players, 12 nobles in line.`)],
     });
   }, []);
 
@@ -202,7 +210,7 @@ export function useGame() {
   const cpuPlay = useCallback(() => {
     setG(prev => {
       if (prev.phase !== 'playing' || !prev.cpu?.[prev.current] || prev.actionPlayed) return prev;
-      const choice = cpuChoose(prev);
+      const choice = cpuChoose(prev, prev.cpuLevel?.[prev.current] ?? 1);
       if (!choice) return { ...prev, actionPlayed: true, message: `${prev.players[prev.current].name} lines up a head…` };
       const result = applyResolved(prev, choice.def, choice.picks, { cardUid: choice.inst.uid });
       return finishAction(prev, choice.def, choice.inst, result);
@@ -244,34 +252,41 @@ function nobleValue(def) {
 
 // Greedy, safe heuristic: bring the best noble to the front / shove a bad one
 // back / grab an extra good head. Skips cards that need player targeting.
-function cpuChoose(G) {
+// level 0 Recrue (hesitant, random) · 1 Résistant (best move) · 2 Maquisard (aggressive).
+function cpuChoose(G, level = 1) {
   const hand = G.players[G.current].hand;
   const line = G.line;
   if (!line.length) return null;
+  if (level <= 0 && Math.random() < 0.5) return null;   // a recruit dithers
   const frontVal = nobleValue(NOBLE_BY_ID[line[0].defId]);
   let bestIdx = -1, bestVal = frontVal;
   for (let i = 1; i < line.length; i++) {
     const v = nobleValue(NOBLE_BY_ID[line[i].defId]);
     if (v > bestVal) { bestVal = v; bestIdx = i; }
   }
+  const grabThresh = level >= 2 ? 1 : 2;   // Maquisard grabs extra heads more readily
+  const options = [];
   for (const inst of hand) {
     const def = ACTION_BY_ID[inst.defId];
     if (!canPlayCard(G, def)) continue;
     const { family, params } = def;
     if (bestIdx > 0 && family === 'toFrontEnd' && params.op === 'anyToFront')
-      return { inst, def, picks: [{ idx: bestIdx }] };
+      options.push({ inst, def, picks: [{ idx: bestIdx }], score: bestVal - frontVal + 5 });
     if (bestIdx > 0 && family === 'lineMove' && params.dir === 'fwd') {
       const cands = lineNobleCandidates(def, line);
       let pick = -1, pv = frontVal;
       for (const i of cands) { const v = nobleValue(NOBLE_BY_ID[line[i].defId]); if (v > pv) { pv = v; pick = i; } }
-      if (pick >= 0) return { inst, def, picks: [{ idx: pick }] };
+      if (pick >= 0) options.push({ inst, def, picks: [{ idx: pick }], score: pv - frontVal + 3 });
     }
     if (frontVal < 1 && family === 'toFrontEnd' && params.op === 'frontToEnd')
-      return { inst, def, picks: [] };
-    if (frontVal >= 2 && family === 'selfEconomy' && params.kind === 'doubleFeature')
-      return { inst, def, picks: [] };
+      options.push({ inst, def, picks: [], score: 2 - frontVal });
+    if (frontVal >= grabThresh && family === 'selfEconomy' && params.kind === 'doubleFeature')
+      options.push({ inst, def, picks: [], score: frontVal + 1 });
   }
-  return null;
+  if (!options.length) return null;
+  if (level <= 0) return options[Math.floor(Math.random() * options.length)];  // recruit improvises
+  options.sort((a, b) => b.score - a.score);
+  return options[0];
 }
 
 // ─── pure helpers ───────────────────────────────────────────────────────────

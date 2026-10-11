@@ -140,36 +140,67 @@ export default function App() {
   );
 }
 
-const MODES = {
-  solo:    { label: 'Solo — you + 2 CPU',   cpu: [false, true, true],   names: ['You', 'CPU 1', 'CPU 2'] },
-  duo:     { label: '2 Players + 1 CPU',    cpu: [false, false, true],  names: ['Player 1', 'Player 2', 'CPU'] },
-  hotseat: { label: '3 Players (hotseat)',  cpu: [false, false, false], names: ['Player 1', 'Player 2', 'Player 3'] },
-};
+// Computer players fight under Resistance code-names; each has a nerve level.
+const RESISTANCE_NAMES = ['Le Renard', 'La Chouette', 'Papillon', 'Le Fantôme', 'Minuit', 'Le Corbeau', 'Lazare', 'Colette'];
+const DIFFS = [
+  { key: 0, label: 'Recrue',    hint: 'Easy — hesitates and improvises' },
+  { key: 1, label: 'Résistant', hint: 'Medium — plays the best obvious move' },
+  { key: 2, label: 'Maquisard', hint: 'Hard — ruthless, grabs every head' },
+];
+function makeSeats(n, prev) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    if (prev && prev[i]) { out.push(prev[i]); continue; }
+    out.push(i === 0
+      ? { human: true, name: 'You', level: 1 }
+      : { human: false, name: RESISTANCE_NAMES[(i - 1) % RESISTANCE_NAMES.length], level: 1 });
+  }
+  return out;
+}
 
 function StartScreen({ onStart }) {
-  const [mode, setMode] = useState('solo');
-  const [names, setNames] = useState(MODES.solo.names);
-  const cpu = MODES[mode].cpu;
-  const pickMode = (m) => { setMode(m); setNames(MODES[m].names); };
+  const [count, setCount] = useState(3);
+  const [seats, setSeats] = useState(() => makeSeats(3));
+  const setCountN = (n) => { setCount(n); setSeats(s => makeSeats(n, s)); };
+  const patch = (i, p) => setSeats(s => s.map((x, j) => (j === i ? { ...x, ...p } : x)));
+  const toggleHuman = (i) => patch(i, seats[i].human
+    ? { human: false, name: RESISTANCE_NAMES[i % RESISTANCE_NAMES.length] }
+    : { human: true, name: i === 0 ? 'You' : `Player ${i + 1}` });
+  const go = () => onStart(
+    seats.map(s => s.name || 'Player'),
+    seats.map(s => !s.human),
+    seats.map(s => (s.human ? 0 : s.level)),
+  );
   return (
     <div className="screen center">
       <img className="start-logo" src="/logo-title.png" alt="Guillotine" />
       <p className="muted">The revolutionary card game where you win by getting a head.</p>
-      <div className="mode-pick">
-        {Object.entries(MODES).map(([k, m]) => (
-          <button key={k} className={'mode-btn' + (mode === k ? ' on' : '')} onClick={() => pickMode(k)}>{m.label}</button>
+      <div className="count-pick">
+        <span className="cp-label">Players</span>
+        {[2, 3, 4, 5].map(n => (
+          <button key={n} className={'count-btn' + (count === n ? ' on' : '')} onClick={() => setCountN(n)}>{n}</button>
         ))}
       </div>
-      <div className="name-inputs">
-        {names.map((n, i) => (
-          <label key={i} className="name-row">
-            <input value={n} disabled={cpu[i]}
-              onChange={e => setNames(names.map((v, j) => j === i ? e.target.value : v))} />
-            {cpu[i] && <span className="cpu-tag">CPU</span>}
-          </label>
+      <div className="seat-list">
+        {seats.map((s, i) => (
+          <div key={i} className={'seat-row' + (s.human ? ' is-human' : ' is-cpu')}>
+            <button className="seat-toggle" onClick={() => toggleHuman(i)} title="Switch Human / Computer">
+              {s.human ? '🧑 Human' : '🤖 CPU'}
+            </button>
+            <input className="seat-name" value={s.name} onChange={e => patch(i, { name: e.target.value })} />
+            {!s.human && (
+              <span className="seat-diffs">
+                {DIFFS.map(d => (
+                  <button key={d.key} className={'diff-btn' + (s.level === d.key ? ' on' : '')}
+                    onClick={() => patch(i, { level: d.key })} title={d.hint}>{d.label}</button>
+                ))}
+              </span>
+            )}
+          </div>
         ))}
       </div>
-      <button className="btn primary" onClick={() => onStart(names, cpu)}>Start Game</button>
+      <button className="btn primary start-btn" onClick={go}>Start Game</button>
+      <p className="muted small resist-note">CPU players are code-named Résistants — set each one's nerve from Recrue to Maquisard.</p>
     </div>
   );
 }
