@@ -226,9 +226,17 @@ export function useGame() {
     setG(restored);
   }, []);
 
+  // Online: hand a dropped friend's seat to the computer (and back on return).
+  const setSeatCpu = useCallback((seat, isCpu) => {
+    setG(prev => (seat < 0 || seat >= prev.players.length) ? prev
+      : { ...prev, cpu: prev.cpu.map((v, i) => (i === seat ? !!isCpu : v)) });
+  }, []);
+  // Resume: drop a whole saved state in (host reload / local resume).
+  const load = useCallback((saved) => { if (saved && saved.players) { past.current = []; setG(saved); } }, []);
+
   return {
     G, start, restart, beginTurn, advanceFromPass: beginTurn,
-    playCard, pick, cancelTarget, collectAndEnd, discardFront, cpuPlay, undo,
+    playCard, pick, cancelTarget, collectAndEnd, discardFront, cpuPlay, undo, setSeatCpu, load,
     canUndo: () => past.current.length > 0 && !G.cpu?.[G.current]
       && (G.phase === 'playing' || G.phase === 'targeting'),
     canPlay: (handIdx) => {

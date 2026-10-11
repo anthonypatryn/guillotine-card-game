@@ -86,15 +86,18 @@ export function sanitize(G, seat) {
 
 // ───────────────────────────── host ─────────────────────────────
 export class HostRoom extends Emitter {
-  constructor(hostName) {
+  constructor(hostName, resume = null) {
     super();
     this.status = 'connecting';
     this.error = '';
-    this.seats = [{ name: hostName || 'You', kind: 'host', connected: true }];
-    this.started = false;
+    this.seats = resume ? resume.seats.map((s) => ({ ...s, connected: s.kind !== 'remote' }))
+      : [{ name: hostName || 'You', kind: 'host', connected: true }];
+    this.started = !!resume;
     this.game = null;            // the live useGame object, kept fresh by the host component
     this.conns = new Map();      // clientId → conn
-    this.open(randomCode());
+    this.wantCode = resume?.code ?? null;  // after a reload: keep trying for the same code
+    this.codeTries = 0;
+    this.open(this.wantCode ?? randomCode());
     this.beat = setInterval(() => {
       const now = Date.now();
       for (const c of [...this.conns.values()]) {
@@ -113,7 +116,12 @@ export class HostRoom extends Emitter {
     peer.on('connection', (conn) => this.attachConn(conn));
     peer.on('disconnected', () => { if (!peer.destroyed) peer.reconnect(); });
     peer.on('error', (e) => {
-      if (e.type === 'unavailable-id') return this.open(randomCode());
+      if (e.type === 'unavailable-id') {
+        // the old tab's code can take a few seconds to free after a reload
+        if (this.wantCode && this.codeTries++ < 8) { setTimeout(() => this.open(this.wantCode), 2500); return; }
+        this.wantCode = null;
+        return this.open(randomCode());
+      }
       if (e.type === 'peer-unavailable') return;
       this.error = errText(e); this.status = this.status === 'open' ? 'open' : 'error'; this.emit();
     });
@@ -134,6 +142,12 @@ export class HostRoom extends Emitter {
       const name = (String(m.name || 'Friend').trim().slice(0, 14)) || 'Friend';
       conn.clientId = id;
       let seat = this.seats.findIndex((s) => s.kind === 'remote' && s.clientId === id);
+      // returning from a different browser (new id, same name as a quiet seat): reclaim it
+      if (seat < 0 && this.started) {
+        const quiet = (s) => !s.connected || Date.now() - (this.conns.get(s.clientId)?.lastSeen ?? 0) > PING_MS * 2;
+        seat = this.seats.findIndex((s) => s.kind === 'remote' && s.name.toLowerCase() === name.toLowerCase() && quiet(s));
+        if (seat >= 0) { this.conns.get(this.seats[seat].clientId)?.close?.(); this.conns.delete(this.seats[seat].clientId); this.seats[seat].clientId = id; }
+      }
       if (seat < 0) {
         if (this.started) { this.refuse(conn, 'That game already started.'); return; }
         if (this.seats.length >= MAX_SEATS) { this.refuse(conn, `That room is full (${MAX_SEATS} players).`); return; }
@@ -141,6 +155,7 @@ export class HostRoom extends Emitter {
         seat = this.seats.length - 1;
       } else {
         this.seats[seat].connected = true;
+        if (this.seats[seat].cpu) { this.seats[seat].cpu = false; this.game?.setSeatCpu(seat, false); }  // they're back: hand the seat back
       }
       this.conns.get(id)?.close?.();
       this.conns.set(id, conn);
@@ -163,9 +178,13 @@ export class HostRoom extends Emitter {
     if (seat < 0 || this.conns.get(conn.clientId) !== conn) return;
     this.conns.delete(conn.clientId);
     this.seats[seat].connected = false;
-    if (!this.started) this.seats.splice(seat, 1);
+    if (!this.started) this.seats.splice(seat, 1);               // left the lobby: free the seat
+    else { this.seats[seat].cpu = true; this.game?.setSeatCpu(seat, true); }  // dropped mid-game: the computer finishes their turns
     this.broadcastLobby(); this.emit();
   }
+
+  // what the host's tab saves so a reload can pick the game back up
+  snapshot() { return { code: this.code, seats: this.seats.map(({ name, kind, level, clientId }) => ({ name, kind, level, clientId })) }; }
 
   refuse(conn, reason) {
     const send = () => { try { conn.send({ t: 'ended', reason }); } catch { /* gone */ } setTimeout(() => { try { conn.close(); } catch { /* gone */ } }, 300); };

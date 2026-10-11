@@ -105,18 +105,47 @@ export default function App() {
 
   // Online: null = local play; else { kind:'home'|'host'|'join', room? }
   const [online, setOnline] = useState(null);
-  const exitOnline = () => { try { online?.room?.close(); } catch { /* ignore */ } setOnline(null); };
+  const exitOnline = () => {
+    try { online?.room?.close(); } catch { /* ignore */ }
+    try { localStorage.removeItem('guillotine-host-save'); } catch { /* ignore */ }
+    setOnline(null);
+  };
+  // On load: resume a host session after a reload, else honour an ?join invite link.
   useEffect(() => {
-    try { if (new URLSearchParams(window.location.search).get('join')) setOnline({ kind: 'home' }); } catch { /* ignore */ }
+    try {
+      const raw = localStorage.getItem('guillotine-host-save');
+      if (raw) {
+        const h = JSON.parse(raw);
+        if (h?.G && h.code && Date.now() - (h.at || 0) < 3 * 3600e3 && h.G.phase !== 'gameOver') {
+          setOnline({ kind: 'host', room: new HostRoom('', h), resumeG: h.G }); return;
+        }
+        localStorage.removeItem('guillotine-host-save');
+      }
+      if (new URLSearchParams(window.location.search).get('join')) setOnline({ kind: 'home' });
+    } catch { /* ignore */ }
   }, []);
-
-  // No handoff screen for now — advance straight into the next turn.
+  // Persist the local game so a refresh can resume it.
   useEffect(() => {
-    if (G.phase === 'pass') {
+    if (online) return;
+    try {
+      if (['playing', 'targeting', 'pass'].includes(G.phase)) localStorage.setItem('guillotine-save', JSON.stringify({ G, at: Date.now() }));
+      else if (G.phase === 'gameOver') localStorage.removeItem('guillotine-save');  // keep across a fresh 'start' so Resume works
+    } catch { /* ignore */ }
+  }, [G, online]);
+  const loadLocalSave = () => { try { const s = JSON.parse(localStorage.getItem('guillotine-save')); if (s?.G) game.load(s.G); } catch { /* ignore */ } };
+  let hasLocalSave = false;
+  try { const s = JSON.parse(localStorage.getItem('guillotine-save')); hasLocalSave = !!(s?.G && s.G.phase !== 'gameOver'); } catch { /* ignore */ }
+
+  // Hotseat handoff: auto-advance for solo games / CPU seats, but pause with a
+  // "pass the device" screen when it moves between two human players.
+  const humanCount = G.cpu.filter((c) => !c).length;
+  const needPass = !online && G.phase === 'pass' && humanCount > 1 && !G.cpu?.[G.current];
+  useEffect(() => {
+    if (G.phase === 'pass' && !needPass) {
       const t = setTimeout(() => game.advanceFromPass(), 0);
       return () => clearTimeout(t);
     }
-  }, [G.phase, G.current, G.day]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [G.phase, G.current, G.day, needPass]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Drive computer players in two beats: play a card, then (after a pause) behead.
   useEffect(() => {
@@ -147,13 +176,14 @@ export default function App() {
         online.kind === 'home'
           ? <OnlineHome onHost={(room) => setOnline({ kind: 'host', room })} onJoin={(room) => setOnline({ kind: 'join', room })} onBack={() => setOnline(null)} />
           : online.kind === 'host'
-            ? <HostShell room={online.room} speed={speed} onExit={exitOnline} />
+            ? <HostShell room={online.room} speed={speed} onExit={exitOnline} resumeG={online.resumeG} />
             : <ClientShell client={online.room} onExit={exitOnline} />
       ) : (
         <>
-          {G.phase === 'start' && <StartScreen onStart={game.start} onOnline={() => setOnline({ kind: 'home' })} />}
+          {G.phase === 'start' && <StartScreen onStart={game.start} onOnline={() => setOnline({ kind: 'home' })} onResume={hasLocalSave ? loadLocalSave : null} />}
           {G.phase === 'gameOver' && <GameOver G={G} onRestart={game.restart} />}
-          {(G.phase === 'playing' || G.phase === 'targeting' || G.phase === 'pass') && <Board game={game} />}
+          {needPass && <PassScreen name={G.players[G.current].name} onReady={game.advanceFromPass} />}
+          {(G.phase === 'playing' || G.phase === 'targeting' || (G.phase === 'pass' && !needPass)) && <Board game={game} />}
         </>
       )}
       <BugReport game={game} />
@@ -162,10 +192,25 @@ export default function App() {
   );
 }
 
-// Portrait phones get a nudge to turn sideways — the board is landscape by nature.
-function RotateHint() {
+// Hotseat handoff — hides the board so the next player doesn't see the last hand.
+function PassScreen({ name, onReady }) {
   return (
-    <div className="rotate-hint" aria-hidden="true">
+    <div className="screen center pass-screen">
+      <p className="muted">Pass the device to</p>
+      <div className="pass-name">{name}</div>
+      <button className="btn primary start-btn" onClick={onReady}>I&rsquo;m {name} — Ready</button>
+    </div>
+  );
+}
+
+// Portrait phones get a nudge to turn sideways — the board is landscape by
+// nature — but it's dismissible, so portrait is still playable.
+function RotateHint() {
+  const [ok, setOk] = useState(() => { try { return sessionStorage.getItem('guillotine-portrait-ok') === '1'; } catch { return false; } });
+  if (ok) return null;
+  const dismiss = () => { try { sessionStorage.setItem('guillotine-portrait-ok', '1'); } catch { /* ignore */ } setOk(true); };
+  return (
+    <div className="rotate-hint">
       <svg viewBox="0 0 64 64" className="rotate-ico" aria-hidden="true">
         <rect x="20" y="6" width="24" height="40" rx="4" fill="none" stroke="currentColor" strokeWidth="3" />
         <path d="M14 52a24 24 0 0 0 36 0" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
@@ -173,6 +218,7 @@ function RotateHint() {
       </svg>
       <p className="rotate-title">Turn your device sideways</p>
       <p className="rotate-sub">Guillotine plays best in landscape.</p>
+      <button className="btn" onClick={dismiss}>Play in portrait anyway</button>
     </div>
   );
 }
@@ -195,7 +241,7 @@ function makeSeats(n, prev) {
   return out;
 }
 
-function StartScreen({ onStart, onOnline }) {
+function StartScreen({ onStart, onOnline, onResume }) {
   const [count, setCount] = useState(3);
   const [seats, setSeats] = useState(() => makeSeats(3));
   const setCountN = (n) => { setCount(n); setSeats(s => makeSeats(n, s)); };
@@ -213,6 +259,7 @@ function StartScreen({ onStart, onOnline }) {
       <div className="start-fleurs" aria-hidden="true" />
       <img className="start-logo" src="/logo-title.png" alt="Guillotine" />
       <p className="muted">The revolutionary card game where you win by getting a head.</p>
+      {onResume && <button className="btn primary start-btn resume-btn" onClick={onResume}>↻ Resume saved game</button>}
       <div className="count-pick">
         <span className="cp-label">Players</span>
         {[2, 3, 4, 5].map(n => (
@@ -961,11 +1008,21 @@ function Lobby({ room, isHost, code, seats, onStart, onExit }) {
   );
 }
 
-function HostShell({ room, speed, onExit }) {
+function HostShell({ room, speed, onExit, resumeG }) {
   useLive(room);
   const game = useGame();
   const { G } = game;
+  const loaded = useRef(false);
+  useEffect(() => { if (resumeG && !loaded.current) { loaded.current = true; game.load(resumeG); room.started = true; } }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { room.game = game; if (room.started) room.pushState(); });  // keep engine fresh + broadcast
+  // save the host session so a reload resumes it (friends auto-reconnect)
+  useEffect(() => {
+    if (!room.started || G.phase === 'start') return;
+    try {
+      if (G.phase === 'gameOver') localStorage.removeItem('guillotine-host-save');
+      else localStorage.setItem('guillotine-host-save', JSON.stringify({ ...room.snapshot(), G, at: Date.now() }));
+    } catch { /* ignore */ }
+  }, [G]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (G.phase === 'pass') { const t = setTimeout(() => game.advanceFromPass(), 0); return () => clearTimeout(t); }
   }, [G.phase, G.current, G.day]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -974,10 +1031,11 @@ function HostShell({ room, speed, onExit }) {
     const t = setTimeout(() => { if (G.actionPlayed) game.collectAndEnd(); else game.cpuPlay(); }, Math.round(1300 / speed));
     return () => clearTimeout(t);
   }, [G.phase, G.current, G.day, G.actionPlayed, speed]); // eslint-disable-line react-hooks/exhaustive-deps
+  const exit = () => { try { localStorage.removeItem('guillotine-host-save'); } catch { /* ignore */ } onExit(); };
   const start = () => { const [names, cpu, lvl] = room.setupArgs(); game.start(names, cpu, lvl); room.markStarted(); };
   if (!room.started || G.phase === 'start')
-    return <Lobby room={room} isHost code={room.code} seats={room.seats} onStart={start} onExit={onExit} />;
-  if (G.phase === 'gameOver') return <GameOver G={G} onRestart={onExit} />;
+    return <Lobby room={room} isHost code={room.code} seats={room.seats} onStart={start} onExit={exit} />;
+  if (G.phase === 'gameOver') return <GameOver G={G} onRestart={exit} />;
   return <Board game={{ ...game, seat: 0 }} />;
 }
 
