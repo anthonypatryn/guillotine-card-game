@@ -681,3 +681,27 @@
 .ts-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
 .ts-font { font-size: 16px; padding: 8px 6px; justify-content: center; text-align: center; }
 .board2 { background-size: auto, 520px; }
+
+/* ===== bug report ===== */
+.bug-fab {
+  position: fixed; bottom: 14px; right: 14px; z-index: 65; width: 42px; height: 42px;
+  border-radius: 50%; border: 1px solid var(--panel-light); background: var(--panel);
+  color: var(--ink); font-size: 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,.5);
+}
+.bug-fab:hover { filter: brightness(1.25); }
+.bug-modal { width: min(92vw, 420px); align-items: stretch; }
+.bug-what, .bug-where {
+  background: var(--panel-light); border: 1px solid var(--panel-light); color: var(--ink);
+  border-radius: 8px; padding: 8px 10px; font-family: var(--font-body); font-size: 14px; width: 100%;
+}
+.bug-what { min-height: 92px; resize: vertical; }
+.bug-status { color: var(--gold); font-size: 13px; }
+.bug-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.bug-list { max-width: 720px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.bug-item { background: var(--panel); border: 1px solid var(--panel-light); border-radius: 10px; padding: 10px 12px; }
+.bug-item.fixed { opacity: .6; }
+.bi-head { display: flex; gap: 8px; align-items: baseline; }
+.bi-status { margin-left: auto; text-transform: uppercase; font-size: 11px; color: var(--gold); }
+.bi-what { margin: 6px 0; white-space: pre-wrap; }
+.bi-log { background: rgba(0,0,0,.25); padding: 6px; border-radius: 6px; font-size: 11px; white-space: pre-wrap; overflow: auto; }
+.bi-actions { display: flex; gap: 6px; margin-top: 6px; }
