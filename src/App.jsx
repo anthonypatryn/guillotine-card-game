@@ -97,8 +97,36 @@ function GameOver({ G, onRestart }) {
   );
 }
 
-const nobleInspect = (def) => ({ img: nobleImg(def.id), name: def.name, sub: COLORS[def.color], text: def.text, color: COLOR_HEX[def.color] });
-const actionInspect = (def) => ({ img: actionImg(def.id), name: def.name, sub: 'Action card', text: def.text, color: '#7a5c3a' });
+const nobleInspect = (def, el) => ({ img: nobleImg(def.id), name: def.name, sub: `${COLORS[def.color]} · ${FACTION[def.color].title}`, text: def.text, color: COLOR_HEX[def.color], rect: el?.getBoundingClientRect() });
+const actionInspect = (def, el) => ({ img: actionImg(def.id), name: def.name, sub: 'Action card', text: def.text, color: '#b4323d', rect: el?.getBoundingClientRect() });
+
+// Faction = noble color. Each has a title and an emblem shown in the point box.
+const FACTION = {
+  blue:   { title: 'Clergy',       sym: '✝' },
+  green:  { title: 'Judiciary',    sym: '⚖' },
+  gray:   { title: 'Common folk',  sym: '⚒' },
+  red:    { title: 'Military',     sym: '⚔' },
+  purple: { title: 'Royalty',      sym: '♛' },
+};
+
+// A severed-head silhouette (bust) used for the faction pips.
+function HeadIcon({ color = 'currentColor', className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <path fill={color} d="M12 2.6a5 5 0 0 1 5 5c0 2-1.1 3.7-2.8 4.6l.5 2.1c3.1.6 5.3 2.3 5.3 4.6V21H4v-2.1c0-2.3 2.2-4 5.3-4.6l.5-2.1A5 5 0 0 1 7 7.6a5 5 0 0 1 5-5z" />
+    </svg>
+  );
+}
+
+function FactionPip({ color, count, title, sym }) {
+  return (
+    <span className="fpip" title={`${title}: ${count} head${count === 1 ? '' : 's'}`}>
+      <HeadIcon color={color} className="fpip-head" />
+      <span className="fpip-sym">{sym}</span>
+      <span className="fpip-ct">{count}</span>
+    </span>
+  );
+}
 
 function Board({ game }) {
   const { G } = game;
@@ -153,6 +181,27 @@ function Board({ game }) {
 
   return (
     <div className="board2">
+      <main className="field">
+        <div className="field-msg">
+          <span className="message">{G.message}</span>
+          <span className="deck-counts">Nobles {G.nobleDeck.length} · Actions {G.actionDeck.length}</span>
+        </div>
+        {locks.length > 0 && <div className="locks">{locks.map((l, i) => <span key={i} className="lock-chip">{l}</span>)}</div>}
+
+        <GuillotineLine G={G} step={step} onPick={game.pick} onInspect={setInspect} />
+
+        <div className="controls">
+          {!targeting && (
+            <button className="btn primary" onClick={game.collectAndEnd}>
+              {G.line.length === 0 ? 'End turn →' : 'Off with their head! 🪓'}
+            </button>
+          )}
+          {targeting && <button className="btn" onClick={game.cancelTarget}>Cancel</button>}
+        </div>
+
+        <HandDock game={game} onInspect={setInspect} />
+      </main>
+
       <aside className="hud2">
         <div className="hud-top">
           <span className="day-chip">Day {G.day} / 3</span>
@@ -168,28 +217,7 @@ function Board({ game }) {
         <LogPanel log={G.log} />
       </aside>
 
-      <main className="field">
-        <div className="field-msg">
-          <span className="message">{G.message}</span>
-          <span className="deck-counts">Nobles {G.nobleDeck.length} · Actions {G.actionDeck.length}</span>
-        </div>
-        {locks.length > 0 && <div className="locks">{locks.map((l, i) => <span key={i} className="lock-chip">{l}</span>)}</div>}
-
-        <GuillotineLine G={G} step={step} onPick={game.pick} onInspect={setInspect} />
-
-        <div className="controls">
-          {!targeting && (
-            <button className="btn primary" onClick={game.collectAndEnd}>
-              {G.line.length === 0 ? 'End turn →' : 'Collect head →'}
-            </button>
-          )}
-          {targeting && <button className="btn" onClick={game.cancelTarget}>Cancel</button>}
-        </div>
-
-        <HandDock game={game} onInspect={setInspect} />
-      </main>
-
-      <InspectorPane inspect={inspect} />
+      <HoverCard inspect={inspect} />
 
       {showPile != null && (
         <NoblePileModal G={G} index={showPile} game={game} step={step} onInspect={setInspect}
@@ -248,10 +276,12 @@ function PlayerCard({ player, index, game, step, onInspect, onExpand }) {
       </div>
       <div className="pc-stats">
         <span title="cards in hand">🖐 {player.hand.length}</span>
-        <span title="heads collected">🗡 {player.scorePile.length}</span>
+        <span className="pc-heads-ct" title="heads collected">
+          <HeadIcon color="var(--muted)" className="hc-small" /> {player.scorePile.length}
+        </span>
         <span className="pc-tally">
           {colors.length === 0 ? <span className="muted small">no heads</span>
-            : colors.map(c => <span key={c} className="pip" style={{ background: COLOR_HEX[c] }} title={COLORS[c]}>{tally[c]}</span>)}
+            : colors.map(c => <FactionPip key={c} color={COLOR_HEX[c]} count={tally[c]} title={FACTION[c].title} sym={FACTION[c].sym} />)}
         </span>
       </div>
       {isCurrent && <TurnSteps G={G} />}
@@ -265,7 +295,7 @@ function PlayerCard({ player, index, game, step, onInspect, onExpand }) {
               <span key={inst.uid} className="front-wrap">
                 <img className={'pc-front' + (clickable ? ' clickable' : '')} src={actionImg(def.id)} alt={def.name}
                   title={`${def.name}\n${def.text}`}
-                  onMouseEnter={() => onInspect(actionInspect(def))} onMouseLeave={() => onInspect(null)}
+                  onMouseEnter={(e) => onInspect(actionInspect(def, e.currentTarget))} onMouseLeave={() => onInspect(null)}
                   onClick={clickable ? (e) => { e.stopPropagation(); game.pick({ playerIdx: index, cardUid: inst.uid }); } : undefined} />
                 {canDiscard && <button className="discard-x" onClick={(e) => { e.stopPropagation(); game.discardFront(inst.uid); }} title="Discard">✕</button>}
               </span>
@@ -334,7 +364,7 @@ function GuillotineLine({ G, step, onPick, onInspect }) {
               className={'noble-card token' + (idx === 0 ? ' front' : '') + (isCand && ordPos < 0 ? ' candidate' : '')}
               style={{ borderColor: COLOR_HEX[def.color] }}
               onClick={() => isCand && ordPos < 0 && onPick({ idx })}
-              onMouseEnter={() => onInspect(nobleInspect(def))}
+              onMouseEnter={(e) => onInspect(nobleInspect(def, e.currentTarget))}
               onMouseLeave={() => onInspect(null)}
               title={`${def.name} — ${COLORS[def.color]}`}>
               <img src={nobleImg(def.id)} alt={def.name} />
@@ -349,24 +379,28 @@ function GuillotineLine({ G, step, onPick, onInspect }) {
   );
 }
 
+// Top-down guillotine, turned to face the line (the next head enters from the left).
 function Guillotine() {
   return (
-    <div className="guillo-wrap" title="The guillotine — next head drops here">
-      <svg className="guillo" viewBox="0 0 96 150" aria-label="guillotine">
-        <rect x="6" y="90" width="84" height="56" rx="3" fill="#5f5147" />
-        <line x1="48" y1="90" x2="48" y2="146" stroke="#4a3f36" strokeWidth="1.5" />
-        <rect x="6" y="90" width="84" height="56" rx="3" fill="none" stroke="#3d342c" strokeWidth="2" />
-        <rect x="12" y="6" width="14" height="128" rx="2" fill="#8d9398" stroke="#5c6165" strokeWidth="1.5" />
-        <rect x="70" y="6" width="14" height="128" rx="2" fill="#8d9398" stroke="#5c6165" strokeWidth="1.5" />
-        <rect x="8" y="2" width="80" height="16" rx="2" fill="#6c7175" stroke="#4e5256" strokeWidth="1.5" />
-        <rect x="30" y="20" width="36" height="16" fill="#9aa0a4" stroke="#6e7377" />
-        <polygon points="30,36 66,36 58,47 38,47" fill="#d2d6d9" stroke="#aeb3b6" />
-        <circle cx="48" cy="72" r="13" fill="#241a14" />
-        <path d="M35 72 a13 13 0 0 1 26 0" fill="none" stroke="#c6a765" strokeWidth="3" />
-        <path d="M35 72 a13 13 0 0 0 26 0" fill="none" stroke="#9c7d3e" strokeWidth="3" />
-        <circle cx="20" cy="44" r="3" fill="#7a3b1e" opacity=".5" />
-        <circle cx="78" cy="104" r="4" fill="#7a3b1e" opacity=".4" />
-        <circle cx="30" cy="120" r="2.5" fill="#7a3b1e" opacity=".4" />
+    <div className="guillo-wrap" title="The guillotine — the next head drops here">
+      <svg className="guillo" viewBox="0 0 140 92" aria-label="guillotine">
+        {/* bascule plank — the victim slides in from the line (left) */}
+        <rect x="2" y="31" width="64" height="30" rx="3" fill="#5f5147" stroke="#3d342c" strokeWidth="2" />
+        <line x1="2" y1="46" x2="66" y2="46" stroke="#4a3f36" strokeWidth="1.2" />
+        {/* frame rails (top & bottom) + far upright */}
+        <rect x="58" y="7" width="76" height="11" rx="2" fill="#7c8186" stroke="#54595d" strokeWidth="1.4" />
+        <rect x="58" y="74" width="76" height="11" rx="2" fill="#7c8186" stroke="#54595d" strokeWidth="1.4" />
+        <rect x="123" y="7" width="12" height="78" rx="2" fill="#6c7175" stroke="#4e5256" strokeWidth="1.4" />
+        {/* blade (mouton), edge facing left toward the neck */}
+        <rect x="96" y="30" width="18" height="32" fill="#9aa0a4" stroke="#6e7377" />
+        <polygon points="96,30 96,62 84,54 84,38" fill="#d2d6d9" stroke="#aeb3b6" />
+        {/* lunette (neck hole) between plank and blade */}
+        <circle cx="72" cy="46" r="12" fill="#241a14" />
+        <path d="M72 34 a12 12 0 0 1 0 24" fill="none" stroke="#c6a765" strokeWidth="3" />
+        <path d="M72 34 a12 12 0 0 0 0 24" fill="none" stroke="#9c7d3e" strokeWidth="3" />
+        {/* rust */}
+        <circle cx="26" cy="38" r="3" fill="#7a3b1e" opacity=".5" />
+        <circle cx="128" cy="68" r="3" fill="#7a3b1e" opacity=".4" />
       </svg>
       <span className="guillo-label">GUILLOTINE</span>
     </div>
@@ -388,7 +422,7 @@ function HandDock({ game, onInspect }) {
           <button key={inst.uid} className={'dock-card' + (playable ? ' playable' : '')}
             style={{ '--i': hi - (n - 1) / 2 }}
             onClick={() => playable && game.playCard(hi)}
-            onMouseEnter={() => onInspect(actionInspect(def))} onMouseLeave={() => onInspect(null)}
+            onMouseEnter={(e) => onInspect(actionInspect(def, e.currentTarget))} onMouseLeave={() => onInspect(null)}
             title={`${def.name}\n${def.text}`}>
             <img src={actionImg(def.id)} alt={def.name} />
           </button>
@@ -415,7 +449,7 @@ function NoblePileModal({ G, index, game, step, onInspect, forced, close }) {
             return <SlicedThumb key={inst.uid} defId={inst.defId} uid={inst.uid}
               className={'pile-card' + (clickable ? ' clickable' : '')}
               title={`${def.name} (${COLORS[def.color]})`}
-              onMouseEnter={() => onInspect(nobleInspect(def))} onMouseLeave={() => onInspect(null)}
+              onMouseEnter={(e) => onInspect(nobleInspect(def, e.currentTarget))} onMouseLeave={() => onInspect(null)}
               onClick={clickable ? () => { game.pick({ idx: pi }); close(); } : undefined} />;
           })}
         </div>
@@ -430,17 +464,25 @@ function NoblePileModal({ G, index, game, step, onInspect, forced, close }) {
   );
 }
 
-function InspectorPane({ inspect }) {
+// A big preview that pops up right next to the card you're hovering.
+function HoverCard({ inspect }) {
+  if (!inspect) return null;
+  const { rect, img, name, sub, text, color } = inspect;
+  const CW = 230;
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1000;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+  let left = rect ? rect.left + rect.width / 2 - CW / 2 : 20;
+  left = Math.max(8, Math.min(vw - CW - 8, left));
+  const placeBelow = rect ? (rect.top < 320 && (vh - rect.bottom) > rect.top) : false;
+  const style = rect
+    ? (placeBelow ? { left, top: rect.bottom + 10 } : { left, bottom: vh - rect.top + 10 })
+    : { left: 20, top: 70 };
   return (
-    <div className={'inspector' + (inspect ? ' show' : '')}>
-      {inspect ? (
-        <>
-          <img className="inspect-img" src={inspect.img} alt={inspect.name} style={{ borderColor: inspect.color }} />
-          <div className="inspect-name">{inspect.name}</div>
-          <div className="inspect-sub" style={{ color: inspect.color }}>{inspect.sub}</div>
-          {inspect.text && <div className="inspect-text">{inspect.text}</div>}
-        </>
-      ) : <div className="inspect-hint">Hover a card to see it big.</div>}
+    <div className="hovercard" style={{ ...style, width: CW }}>
+      <img className="hc-img" src={img} alt={name} style={{ borderColor: color }} />
+      <div className="hc-name">{name}</div>
+      <div className="hc-sub" style={{ color }}>{sub}</div>
+      {text && <div className="hc-text">{text}</div>}
     </div>
   );
 }
@@ -471,6 +513,16 @@ function MusicPlayer() {
     a.src = TRACKS[idx].src; a.volume = vol;
     if (playing) a.play().catch(() => {});
   }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Auto-start on the first user gesture (browsers block autoplay before that).
+  useEffect(() => {
+    const start = () => {
+      const a = audioRef.current;
+      if (a && a.paused) a.play().then(() => setPlaying(true)).catch(() => {});
+    };
+    window.addEventListener('pointerdown', start, { once: true });
+    return () => window.removeEventListener('pointerdown', start);
+  }, []);
+
   const toggle = () => {
     const a = audioRef.current;
     if (!a) return;

@@ -1,29 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Pirata+One&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&family=EB+Garamond:wght@400;500;600;700&display=swap');
+
 * { box-sizing: border-box; }
 
 :root {
-  --bg: #1b1410;
-  --panel: #2a201a;
-  --panel-light: #3a2d24;
-  --ink: #f3e9da;
-  --muted: #b8a890;
-  --accent: #b03a2e;
-  --accent-bright: #e74c3c;
-  --gold: #c9a227;
+  /* Parisian palette — wine, antique gold, cream, ink */
+  --bg: #171210;
+  --panel: #241a14;
+  --panel-light: #3b2d22;
+  --ink: #f1e7d4;
+  --muted: #b7a586;
+  --accent: #7e1d26;          /* bordeaux */
+  --accent-bright: #b4323d;   /* brighter wine */
+  --gold: #c8a24a;            /* gilt */
+  --cream: #efe3cd;
+  --azure: #2f4a7a;           /* tricolor blue accent */
 
+  /* noble faction colors (also mirrored in JS COLOR_HEX) */
   --blue: #4a90c2;
   --green: #6aa84f;
   --gray: #8a8a8a;
   --red: #c0392b;
   --purple: #8e5fb0;
+
+  --font-display: 'Pirata One', 'Playfair Display', serif;
+  --font-head: 'Playfair Display', Georgia, serif;
+  --font-body: 'EB Garamond', Georgia, serif;
 }
 
-html, body, #root {
-  margin: 0;
-  height: 100%;
-}
+html, body, #root { margin: 0; height: 100%; }
 
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family: 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font-body);
+  font-size: 16px;
 }
+
+h1, h2, h3 { font-family: var(--font-head); font-weight: 700; }
