@@ -92,7 +92,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>Guillotine</h1>
+        <h1><Fleur className="title-fleur" />Guillotine</h1>
         <span className="tagline">win by getting a head</span>
         <button className="nav-btn theme-btn" onClick={() => setShowTheme(true)} title="Theme &amp; fonts">🎨</button>
         <MusicPlayer />
@@ -118,8 +118,9 @@ function StartScreen({ onStart }) {
   const pickMode = (m) => { setMode(m); setNames(MODES[m].names); };
   return (
     <div className="screen center">
+      <div className="go-fleurs"><Fleur className="fleur" /><Fleur className="fleur" /><Fleur className="fleur" /></div>
       <h2>Guillotine</h2>
-      <p className="muted">Most heads after 3 days wins.</p>
+      <p className="muted">The revolutionary card game where you win by getting a head.</p>
       <div className="mode-pick">
         {Object.entries(MODES).map(([k, m]) => (
           <button key={k} className={'mode-btn' + (mode === k ? ' on' : '')} onClick={() => pickMode(k)}>{m.label}</button>
@@ -140,21 +141,32 @@ function StartScreen({ onStart }) {
 }
 
 function GameOver({ G, onRestart }) {
-  const scored = G.players.map(p => ({ name: p.name, total: computeScore(p).total }));
-  const max = Math.max(...scored.map(s => s.total));
-  const winners = scored.filter(s => s.total === max).map(s => s.name);
+  const awards = accolades(G.players);
+  const rows = G.players.map((p, i) => ({ name: p.name, total: computeScore(p).total, idx: i }))
+    .sort((a, b) => b.total - a.total);
+  const max = rows[0].total;
+  const winners = rows.filter(r => r.total === max).map(r => r.name);
   return (
-    <div className="screen center">
-      <h2>Game Over</h2>
-      <div className="final-scores">
-        {[...scored].sort((a, b) => b.total - a.total).map(s => (
-          <div key={s.name} className={'final-row' + (s.total === max ? ' win' : '')}>
-            <span>{s.name}</span><span>{s.total}</span>
+    <div className="screen center gameover">
+      <div className="go-fleurs"><Fleur className="fleur" /><Fleur className="fleur" /><Fleur className="fleur" /></div>
+      <h2>Fin de la Révolution</h2>
+      <h3 className="go-winner">
+        {winners.length > 1 ? `Tie — ${winners.join(' & ')}!` : `${winners[0]} wins!`}
+      </h3>
+      <div className="go-rows">
+        {rows.map((r, place) => (
+          <div key={r.name} className={'go-row' + (r.total === max ? ' win' : '')}>
+            <span className="go-place">{place === 0 ? '👑' : `${place + 1}.`}</span>
+            <span className="go-name">{r.name}</span>
+            <span className="go-score"><HeadScore value={r.total} /></span>
+            <span className="go-awards">
+              {awards[r.idx].map(a => <span key={a.title} className="award" title={a.desc}>{a.title}</span>)}
+            </span>
           </div>
         ))}
       </div>
-      <h3>{winners.length > 1 ? `Tie: ${winners.join(' & ')}` : `${winners[0]} wins!`}</h3>
-      <button className="btn primary" onClick={onRestart}>Play Again</button>
+      <p className="go-cry">Vive la Révolution !</p>
+      <button className="btn primary" onClick={onRestart}>Encore ! (Play Again)</button>
     </div>
   );
 }
@@ -203,6 +215,41 @@ function BasketPip({ color, count, title, sym }) {
       <span className="bpip-ct">{count}</span>
     </span>
   );
+}
+
+function Fleur({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 30" aria-hidden="true">
+      <path fill="currentColor" d="M12 1c-1.3 2.4-1.3 4.6 0 6.6 1.3-2 1.3-4.2 0-6.6z
+        M11.3 8.4C8 5.9 4.6 7 4.2 10.3c-.3 2.6 1.7 4.4 4.6 4.3-1.9.9-2.9 2.4-2.3 4h2.1c-.2-.9.3-1.7 1.2-2v4.1H7.6v1.8h2.2v3.2C8.4 29 7.2 28.4 6.4 27c.6 2.1 2.6 3.2 5.6 3.2s5-1.1 5.6-3.2c-.8 1.4-2 2-3.4 1.7v-3.2h2.2v-1.8h-2.2v-4.1c.9.3 1.4 1.1 1.2 2h2.1c.6-1.6-.4-3.1-2.3-4 2.9.1 4.9-1.7 4.6-4.3C19.4 7 16 5.9 12.7 8.4c.5-.9.5-2 0-2.9-.5.9-.5 2 0 2.9-.4-.3-.9-.3-1.4 0z"/>
+    </svg>
+  );
+}
+
+// Fun French end-game awards derived from each player's collected heads.
+function accolades(players) {
+  const stat = players.map(p => {
+    const nobles = p.scorePile.map(i => NOBLE_BY_ID[i.defId]);
+    const byColor = {};
+    nobles.forEach(n => { byColor[n.color] = (byColor[n.color] || 0) + 1; });
+    return { total: p.scorePile.length, byColor };
+  });
+  const winnerBy = (fn) => {
+    let bi = -1, bv = 0;
+    stat.forEach((s, i) => { const v = fn(s); if (v > bv) { bv = v; bi = i; } });
+    return bi;
+  };
+  const DEFS = [
+    { title: '👑 La Tête Royale', desc: 'most royals beheaded', idx: winnerBy(s => s.byColor.purple || 0) },
+    { title: '⚔ Le Général',     desc: 'most military',        idx: winnerBy(s => s.byColor.red || 0) },
+    { title: '✝ Le Dévot',       desc: 'most clergy',          idx: winnerBy(s => s.byColor.blue || 0) },
+    { title: '⚖ La Justice',     desc: 'most judiciary',       idx: winnerBy(s => s.byColor.green || 0) },
+    { title: '⚒ Ami du Peuple',  desc: 'most common folk',     idx: winnerBy(s => s.byColor.gray || 0) },
+    { title: '🧺 Le Boucher',    desc: 'most heads overall',   idx: winnerBy(s => s.total) },
+  ];
+  const per = players.map(() => []);
+  DEFS.forEach(d => { if (d.idx >= 0) per[d.idx].push(d); });
+  return per;
 }
 
 // Total points shown inside a black severed-head silhouette.

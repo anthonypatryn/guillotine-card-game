@@ -630,3 +630,25 @@
 .hovercard.center .hc-name { font-size: 22px; }
 .hovercard.center .hc-sub { font-size: 14px; }
 .hovercard.center .hc-text { font-size: 15px; }
+
+/* ===== fleur-de-lis flair · accolades · game over ===== */
+.fleur { color: var(--gold); width: 22px; height: 28px; display: inline-block; }
+.title-fleur { width: 20px; height: 26px; color: var(--gold); vertical-align: -5px; margin-right: 8px; opacity: .92; }
+.go-fleurs { display: flex; gap: 16px; justify-content: center; color: var(--gold); margin-bottom: 4px; }
+.go-fleurs .fleur { width: 26px; height: 34px; }
+
+.gameover h2 { font-family: var(--font-display); font-size: 42px; color: var(--accent-bright); margin: 6px 0; letter-spacing: 1px; }
+.go-winner { font-family: var(--font-head); color: var(--gold); font-size: 25px; margin: 0 0 12px; }
+.go-rows { display: flex; flex-direction: column; gap: 8px; width: min(92vw, 480px); }
+.go-row {
+  display: grid; grid-template-columns: 30px 1fr auto 1.2fr; align-items: center; gap: 10px;
+  background: var(--panel); border: 1px solid var(--panel-light); border-radius: 10px; padding: 8px 12px;
+}
+.go-row.win { border-color: var(--gold); box-shadow: 0 0 12px rgba(201,162,39,.4); }
+.go-place { font-size: 18px; text-align: center; }
+.go-name { font-family: var(--font-head); font-weight: 700; text-align: left; }
+.go-score .headscore { width: 36px; height: 38px; }
+.go-score .hs-num { width: 36px; font-size: 14px; top: 10px; }
+.go-awards { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.award { background: var(--panel-light); border: 1px solid var(--gold); border-radius: 12px; padding: 2px 8px; font-size: 12px; white-space: nowrap; }
+.go-cry { font-family: var(--font-head); font-style: italic; color: var(--muted); font-size: 19px; margin: 8px 0; }
