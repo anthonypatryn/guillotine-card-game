@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
 import { NOBLE_BY_ID, COLOR_HEX, nobleImg } from './data/cards';
 
-export const REDUCE = typeof matchMedia !== 'undefined'
+let _reduce = typeof matchMedia !== 'undefined'
   && matchMedia('(prefers-reduced-motion: reduce)').matches;
+export function setReduce(v) { _reduce = !!v; }
+export function isReduced() { return _reduce; }
 
 // deterministic pseudo-random in [0,1) from an integer — so a card's slice
 // angle is the same in flight and in the score pile, and stable across renders.
@@ -40,7 +42,7 @@ export function SliceFlier({ flier, onDone }) {
   useLayoutEffect(() => {
     const dx = to.x - from.x, dy = to.y - from.y;
     const sx = 8 + rng(uid + 3) * 8, sy = 16 + rng(uid + 5) * 10;
-    const dur = REDUCE ? 1 : 840;
+    const dur = _reduce ? 1 : 840;
     const opt = { duration: dur, easing: 'cubic-bezier(.35,.1,.25,1)', fill: 'forwards' };
     // 0–.14 = anticipation (the card presses down), .28 = the cut, then tumble to the pile.
     const aTop = topRef.current.animate([
@@ -55,7 +57,7 @@ export function SliceFlier({ flier, onDone }) {
       { transform: `translate(${sx}px,${sy}px) rotate(${4 + p.rot}deg)`, opacity: 1, offset: .3 },
       { transform: `translate(${dx}px,${dy + 6}px) rotate(${-p.rot * 2}deg) scale(.34)`, opacity: .2, offset: 1 },
     ], opt);
-    if (slashRef.current && !REDUCE) {
+    if (slashRef.current && !_reduce) {
       slashRef.current.animate([
         { transform: 'scaleX(0)', opacity: 0, offset: 0 },
         { transform: 'scaleX(0)', opacity: 0, offset: .18 },
@@ -89,7 +91,7 @@ export function BloodSplatter({ splat, onDone }) {
   const src = useMemo(() => BLOOD[Math.floor(rng(splat.key) * BLOOD.length)], [splat.key]);
 
   useLayoutEffect(() => {
-    if (REDUCE) { onDone(); return; }
+    if (_reduce) { onDone(); return; }
     const a = ref.current.animate([
       { opacity: 0, transform: 'scale(.55)' },
       { opacity: .95, transform: 'scale(1.07)', offset: .1 },

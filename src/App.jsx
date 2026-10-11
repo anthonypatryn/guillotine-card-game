@@ -7,7 +7,7 @@ import {
 } from './data/cards';
 import { computeScore } from './utils/scoring';
 import { judgeBlocks, callousActive } from './utils/effects';
-import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner } from './Effects';
+import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner, setReduce } from './Effects';
 import { playBehead, playWhoosh, isMuted, toggleMuted } from './sound';
 
 // ─── Themes: color palettes + font sets (chosen in the Theme sheet) ─────────
@@ -78,6 +78,14 @@ export default function App() {
   const [showTheme, setShowTheme] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [speed, setSpeed] = useState(() => { try { return Number(localStorage.getItem('guillotine-speed')) || 1; } catch { return 1; } });
+  const [reduce, setReduceState] = useState(() => {
+    try { const v = localStorage.getItem('guillotine-reduce'); return v == null ? false : v === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    setReduce(reduce);
+    if (typeof document !== 'undefined') document.documentElement.dataset.reduce = reduce ? '1' : '';
+    try { localStorage.setItem('guillotine-reduce', reduce ? '1' : '0'); } catch { /* ignore */ }
+  }, [reduce]);
   const setTheme = (patch) => {
     const nt = { ...theme, ...patch };
     setThemeState(nt); applyTheme(nt);
@@ -117,7 +125,7 @@ export default function App() {
         <MusicPlayer />
       </header>
       {showTheme && <ThemeSheet theme={theme} setTheme={setTheme} close={() => setShowTheme(false)} />}
-      {showHelp && <HelpSheet close={() => setShowHelp(false)} />}
+      {showHelp && <HelpSheet close={() => setShowHelp(false)} reduce={reduce} setReduce={setReduceState} />}
       {G.phase === 'start' && <StartScreen onStart={game.start} />}
       {G.phase === 'gameOver' && <GameOver G={G} onRestart={game.restart} />}
       {(G.phase === 'playing' || G.phase === 'targeting' || G.phase === 'pass') && <Board game={game} />}
@@ -371,6 +379,7 @@ function Board({ game }) {
             </button>
           )}
           {targeting && <button className="btn" onClick={game.cancelTarget}>Cancel</button>}
+          {game.canUndo() && <button className="btn" onClick={game.undo}>↶ Undo</button>}
         </div>
 
         <HandDock game={game} onInspect={setInspect} />
@@ -753,7 +762,7 @@ function LogPanel({ log }) {
   );
 }
 
-function HelpSheet({ close }) {
+function HelpSheet({ close, reduce, setReduce }) {
   return (
     <div className="modal-backdrop" onClick={close}>
       <div className="modal help-sheet" onClick={e => e.stopPropagation()}>
@@ -772,6 +781,10 @@ function HelpSheet({ close }) {
             <span>✝ Clergy</span><span>⚖ Judiciary</span><span>⚒ Common folk</span><span>⚔ Military</span><span>♛ Royalty</span>
           </div>
           <p className="muted small">Watch for combos: Count + Countess, stacking Palace Guards, and negative "good-guy" nobles (Hero, Tragic Figure). Hover any card to see it big.</p>
+          <label className="help-toggle">
+            <input type="checkbox" checked={reduce} onChange={e => setReduce(e.target.checked)} />
+            Reduce motion (fewer animations)
+          </label>
         </div>
         <button className="btn primary" onClick={close}>Got it</button>
       </div>

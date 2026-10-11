@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   buildNobleDeck, buildActionDeck, shuffle,
   NOBLE_BY_ID, ACTION_BY_ID,
@@ -55,6 +55,9 @@ const pushLog = (log, ...entries) => [...log, ...entries].slice(-LOG_MAX);
 
 export function useGame() {
   const [G, setG] = useState(fresh);
+  const gRef = useRef(G); gRef.current = G;
+  const past = useRef([]);                 // snapshots for Undo (this turn only)
+  const snap = () => { past.current = [...past.current, gRef.current].slice(-20); };
 
   const start = useCallback((names, cpu) => {
     let actionDeck = buildActionDeck();
@@ -80,6 +83,7 @@ export function useGame() {
   const restart = useCallback(() => setG(fresh()), []);
 
   const beginTurn = useCallback(() => {
+    past.current = [];                      // fresh undo history each turn
     setG(prev => {
       if (prev.line.length === 0) return endDay(prev, false);
       const blocked = prev.skipAction[prev.current];
@@ -103,6 +107,11 @@ export function useGame() {
   }, []);
 
   const playCard = useCallback((handIdx) => {
+    const Gnow = gRef.current;
+    if (Gnow.phase === 'playing' && !Gnow.actionPlayed && !Gnow.cpu?.[Gnow.current]) {
+      const inst = Gnow.players[Gnow.current].hand[handIdx];
+      if (inst && canPlayCard(Gnow, ACTION_BY_ID[inst.defId])) snap();
+    }
     setG(prev => {
       if (prev.phase !== 'playing' || prev.actionPlayed) return prev;
       const inst = prev.players[prev.current].hand[handIdx];
@@ -172,6 +181,7 @@ export function useGame() {
   }, []);
 
   const collectAndEnd = useCallback(() => {
+    past.current = [];                      // turn ends — no undo across it
     setG(prev => {
       if (prev.phase !== 'playing') return prev;
       let s = prev;
@@ -199,9 +209,20 @@ export function useGame() {
     });
   }, []);
 
+  const undo = useCallback(() => {
+    if (gRef.current.cpu?.[gRef.current.current]) return;
+    const p = past.current;
+    if (!p.length) return;
+    const restored = p[p.length - 1];
+    past.current = p.slice(0, -1);
+    setG(restored);
+  }, []);
+
   return {
     G, start, restart, beginTurn, advanceFromPass: beginTurn,
-    playCard, pick, cancelTarget, collectAndEnd, discardFront, cpuPlay,
+    playCard, pick, cancelTarget, collectAndEnd, discardFront, cpuPlay, undo,
+    canUndo: () => past.current.length > 0 && !G.cpu?.[G.current]
+      && (G.phase === 'playing' || G.phase === 'targeting'),
     canPlay: (handIdx) => {
       if (G.phase !== 'playing' || G.actionPlayed) return false;
       const inst = G.players[G.current].hand[handIdx];
