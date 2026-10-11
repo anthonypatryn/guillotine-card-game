@@ -1178,6 +1178,51 @@
   font-size: 12px; overflow-x: auto; }
 .ce-btns { display: flex; gap: 10px; justify-content: center; }
 
+/* ================================================================
+   Mobile / touch
+   ================================================================ */
+
+/* a tapped ("pinned") preview behaves like a modal: backdrop + explicit close */
+.hovercard-backdrop { position: fixed; inset: 0; z-index: 57; background: rgba(0, 0, 0, .5); }
+.hovercard.center { z-index: 58; }
+.hovercard.center.pinned { z-index: 59; }
+.hc-close { margin-top: 8px; width: 100%; background: var(--panel-light); color: var(--ink);
+  border: 1px solid var(--panel-light); border-radius: 8px; padding: 10px; cursor: pointer; font-family: var(--font-head); }
+
+/* turn a portrait phone sideways — the board is landscape by nature */
+.rotate-hint { display: none; }
+@keyframes rotateNudge { 0%, 55%, 100% { transform: rotate(0); } 28% { transform: rotate(-90deg); } }
+@media (orientation: portrait) and (max-width: 860px) and (pointer: coarse) {
+  .rotate-hint {
+    display: flex; position: fixed; inset: 0; z-index: 300; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; gap: 12px; padding: 28px;
+    background: radial-gradient(130% 130% at 50% 40%, color-mix(in srgb, var(--accent) 55%, var(--bg)), var(--bg));
+    color: var(--cream);
+  }
+  .rotate-ico { width: 84px; height: 84px; color: var(--gold); animation: rotateNudge 2.6s ease-in-out infinite; }
+  .rotate-title { font-family: var(--font-display); font-size: 26px; color: var(--gold); margin: 4px 0 0; }
+  .rotate-sub { font-family: var(--font-head); font-size: 15px; color: var(--muted); margin: 0; }
+}
+
+/* touch devices: bigger tap targets, no hover lift, less card fan, fitting modals */
+@media (pointer: coarse) {
+  .dock-card { margin: 0 -6px; }
+  .dock-card:hover, .noble-card:hover, .pc-front:hover { transform: none; }
+  .btn, .nav-btn, .mode-btn, .mp-btn, .count-btn, .seat-toggle, .diff-btn { min-height: 42px; }
+  .guillo-cta { font-size: 13px; }
+  .modal, .theme-sheet, .help-sheet, .bug-modal, .pile-modal { max-width: 94vw; }
+}
+
+/* short viewports (landscape phones): keep the centred preview on screen */
+@media (max-height: 540px) {
+  .hovercard.center { width: min(78vw, 300px); max-height: 94vh; overflow: auto; padding: 10px; }
+  .hovercard.center .hc-img { max-height: 58vh; width: auto; margin: 0 auto; }
+  .hovercard.center .hc-name { font-size: 18px; }
+  .hovercard.center .hc-text { font-size: 13px; }
+  .topbar { padding-top: 2px; padding-bottom: 2px; }
+  .topbar-logo { height: 30px; }
+}
+
 /* ===== number positions dialed in via the card editor (/?view=cardedit) =====
    container-type: size lets the font (cqh = % of box height) scale in every
    context the art appears at. Values from the editor. */

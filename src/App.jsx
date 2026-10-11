@@ -139,6 +139,22 @@ export default function App() {
       {G.phase === 'gameOver' && <GameOver G={G} onRestart={game.restart} />}
       {(G.phase === 'playing' || G.phase === 'targeting' || G.phase === 'pass') && <Board game={game} />}
       <BugReport game={game} />
+      <RotateHint />
+    </div>
+  );
+}
+
+// Portrait phones get a nudge to turn sideways — the board is landscape by nature.
+function RotateHint() {
+  return (
+    <div className="rotate-hint" aria-hidden="true">
+      <svg viewBox="0 0 64 64" className="rotate-ico" aria-hidden="true">
+        <rect x="20" y="6" width="24" height="40" rx="4" fill="none" stroke="currentColor" strokeWidth="3" />
+        <path d="M14 52a24 24 0 0 0 36 0" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <path d="M50 44v9h-9" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <p className="rotate-title">Turn your device sideways</p>
+      <p className="rotate-sub">Guillotine plays best in landscape.</p>
     </div>
   );
 }
@@ -241,6 +257,10 @@ function GameOver({ G, onRestart }) {
     </div>
   );
 }
+
+// Touch devices have no hover — a tap opens the pinned preview instead of
+// playing straight away, so you can read the card and confirm with Play.
+const COARSE = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 
 // Which line nobles an action card would affect right now (for the hover hint).
 function affectedLineUids(def, G) {
@@ -353,17 +373,22 @@ function Board({ game }) {
   const targeting = G.phase === 'targeting';
   const step = game.step();
   const [inspect, setInspect] = useState(null);
+  const [hintUids, setHintUids] = useState(null);
+  const inspectRef = useRef(null); inspectRef.current = inspect;
   const inspectT = useRef(null);
-  // Setting an inspect shows the preview at once; clearing it waits a beat so the
-  // pointer can travel to the centered preview and click its Play button.
+  // Touch has no hover: a tap PINS the preview (with its Play button) until the
+  // player dismisses it; a mouse hover shows it transiently. `ins.pinned` marks a
+  // tapped preview; `ins.affected` drives the line highlight.
   const onInspect = (ins) => {
+    if (ins && !ins.pinned && inspectRef.current?.pinned) return;      // hover can't replace a pinned preview
     clearTimeout(inspectT.current);
-    if (ins) setInspect(ins);
-    else inspectT.current = setTimeout(() => setInspect(null), 420);
+    if (ins) { setInspect(ins); setHintUids(ins.affected || null); }
+    else if (inspectRef.current?.pinned) return;                       // mouse-leave doesn't close a pinned one
+    else inspectT.current = setTimeout(() => { setInspect(null); setHintUids(null); }, 420);
   };
   const keepInspect = () => clearTimeout(inspectT.current);
+  const closeInspect = () => { clearTimeout(inspectT.current); setInspect(null); setHintUids(null); };
   const [expanded, setExpanded] = useState(null);
-  const [hintUids, setHintUids] = useState(null);
   const [fliers, setFliers] = useState([]);
   const [splats, setSplats] = useState([]);
   const [deals, setDeals] = useState([]);
@@ -476,7 +501,7 @@ function Board({ game }) {
 
         <GuillotineLine game={game} step={step} onPick={game.pick} onInspect={onInspect} targeting={targeting} drop={dropTick} hint={hintUids} />
 
-        <HandDock game={game} onInspect={onInspect} onHint={setHintUids} />
+        <HandDock game={game} onInspect={onInspect} />
       </main>
 
       <aside className="hud2">
@@ -494,7 +519,7 @@ function Board({ game }) {
         <LogPanel log={G.log} />
       </aside>
 
-      <HoverCard inspect={inspect} onKeep={keepInspect} onClose={() => { clearTimeout(inspectT.current); setInspect(null); }} />
+      <HoverCard inspect={inspect} onKeep={keepInspect} onLeave={() => onInspect(null)} onClose={closeInspect} />
 
       {showPile != null && (
         <NoblePileModal G={G} index={showPile} game={game} step={step} onInspect={onInspect}
@@ -651,11 +676,11 @@ function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint }
               data-line-uid={inst.uid}
               className={'noble-card token' + (idx === 0 ? ' front' : '') + (isCand && ordPos < 0 ? ' candidate' : '') + (hint?.has(inst.uid) ? ' affected' : '')}
               style={{ borderColor: COLOR_HEX[def.color] }}
-              onClick={() => isCand && ordPos < 0 && onPick({ idx })}
+              onClick={(e) => { if (isCand && ordPos < 0) onPick({ idx }); else onInspect({ ...nobleInspect(def, e.currentTarget), pinned: true }); }}
               onMouseEnter={(e) => onInspect(nobleInspect(def, e.currentTarget))}
               onMouseLeave={() => onInspect(null)}
               title={`${def.name} — ${COLORS[def.color]}`}>
-              <img src={nobleImg(def.id)} alt={def.name} />
+              <img src={nobleImg(def.id)} alt={def.name} loading="lazy" decoding="async" />
               {idx === 0 && ordPos < 0 && <span className="front-tag">NEXT</span>}
               {ordPos >= 0 && <span className="order-tag">{ordPos + 1}</span>}
             </button>
@@ -749,7 +774,7 @@ function DeckPile({ kind, count, label }) {
 }
 
 // ─── The logged-in player's action-card hand ────────────────────────────────
-function HandDock({ game, onInspect, onHint }) {
+function HandDock({ game, onInspect }) {
   const { G } = game;
   if (G.cpu?.[G.current]) return <div className="hand-dock cpu">{G.players[G.current].name} is thinking…</div>;
   const hand = G.players[G.current].hand;
@@ -759,14 +784,16 @@ function HandDock({ game, onInspect, onHint }) {
       {hand.map((inst, hi) => {
         const def = ACTION_BY_ID[inst.defId];
         const playable = game.canPlay(hi);
+        const ins = (el) => ({ ...actionInspect(def, el), onPlay: playable ? () => game.playCard(hi) : null,
+          affected: playable ? affectedLineUids(def, G) : null });
         return (
           <button key={inst.uid} className={'dock-card' + (playable ? ' playable' : '')}
             style={{ '--i': hi - (n - 1) / 2 }}
-            onClick={() => playable && game.playCard(hi)}
-            onMouseEnter={(e) => { onInspect({ ...actionInspect(def, e.currentTarget), onPlay: playable ? () => game.playCard(hi) : null }); onHint && onHint(playable ? affectedLineUids(def, G) : null); }}
-            onMouseLeave={() => { onInspect(null); onHint && onHint(null); }}
+            onClick={(e) => { if (COARSE) onInspect({ ...ins(e.currentTarget), pinned: true }); else if (playable) game.playCard(hi); }}
+            onMouseEnter={(e) => onInspect(ins(e.currentTarget))}
+            onMouseLeave={() => onInspect(null)}
             title={`${def.name}\n${def.text}`}>
-            <img src={actionImg(def.id)} alt={def.name} />
+            <img src={actionImg(def.id)} alt={def.name} loading="lazy" decoding="async" />
           </button>
         );
       })}
@@ -809,23 +836,28 @@ function NoblePileModal({ G, index, game, step, onInspect, forced, close }) {
 
 // A big preview in one consistent spot (screen center) so the eye always knows
 // where to look — never jumping around the hovered card.
-function HoverCard({ inspect, onKeep, onClose }) {
+function HoverCard({ inspect, onKeep, onLeave, onClose }) {
   if (!inspect) return null;
-  const { img, name, faction, factionName, text, color, onPlay } = inspect;
+  const { img, name, faction, factionName, text, color, onPlay, pinned } = inspect;
   return (
-    <div className="hovercard center" onMouseEnter={onKeep} onMouseMove={onKeep} onMouseLeave={onClose}>
-      <div className="hc-imgwrap">
-        <img className="hc-img" src={img} alt={name} style={{ borderColor: color }} />
-        {faction && <img className="hc-emblem" src={`/art/symbol-${faction}.svg`} alt={factionName} title={factionName} />}
+    <>
+      {pinned && <div className="hovercard-backdrop" onClick={onClose} />}
+      <div className={'hovercard center' + (pinned ? ' pinned' : '')}
+        onMouseEnter={onKeep} onMouseMove={onKeep} onMouseLeave={onLeave}>
+        <div className="hc-imgwrap">
+          <img className="hc-img" src={img} alt={name} style={{ borderColor: color }} />
+          {faction && <img className="hc-emblem" src={`/art/symbol-${faction}.svg`} alt={factionName} title={factionName} />}
+        </div>
+        <div className="hc-name">{name}</div>
+        {text && <div className="hc-text">{text}</div>}
+        {onPlay && (
+          <button className="btn primary hc-play" onClick={() => { onPlay(); onClose && onClose(); }}>
+            Play this card ▸
+          </button>
+        )}
+        {pinned && <button className="hc-close" onClick={onClose}>{onPlay ? 'Cancel' : 'Close'}</button>}
       </div>
-      <div className="hc-name">{name}</div>
-      {text && <div className="hc-text">{text}</div>}
-      {onPlay && (
-        <button className="btn primary hc-play" onClick={() => { onPlay(); onClose && onClose(); }}>
-          Play this card ▸
-        </button>
-      )}
-    </div>
+    </>
   );
 }
 
