@@ -496,7 +496,13 @@ function Board({ game }) {
         <div className="field-msg">
           <span className="message">{G.message}</span>
         </div>
-        <TurnSteps G={G} />
+        <div className="field-bar">
+          <TurnSteps G={G} />
+          <div className="decks-col">
+            <DeckPile kind="noble" count={G.nobleDeck.length} label="Nobles" />
+            <DeckPile kind="action" count={G.actionDeck.length} label="Actions" />
+          </div>
+        </div>
         {locks.length > 0 && <div className="locks">{locks.map((l, i) => <span key={i} className="lock-chip">{l}</span>)}</div>}
 
         <GuillotineLine game={game} step={step} onPick={game.pick} onInspect={onInspect} targeting={targeting} drop={dropTick} hint={hintUids} />
@@ -660,10 +666,6 @@ function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint }
   const cta = G.line.length === 0 ? 'End turn' : 'Off with their head!';
   return (
     <div className="line-area">
-      <div className="decks-col">
-        <DeckPile kind="noble" count={G.nobleDeck.length} label="Nobles" />
-        <DeckPile kind="action" count={G.actionDeck.length} label="Actions" />
-      </div>
       <div className="line-scroll" ref={scrollRef}>
         {display.length === 0 && <div className="line-empty">The line is empty.</div>}
         {display.map(({ inst, idx }) => {
@@ -690,9 +692,9 @@ function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint }
       <div className="guillo-col">
         <button className={'guillo-btn' + (canBehead ? ' live' : '') + (canBehead && G.line.length > 0 ? ' pulse' : '')}
           onClick={canBehead ? game.collectAndEnd : undefined} disabled={!canBehead}
-          title={canBehead ? cta : 'The guillotine'}>
+          title={canBehead ? cta : 'Wait for your turn'}>
           <Guillotine drop={drop} />
-          <span className="guillo-cta">{canBehead ? cta : ' '}</span>
+          <span className="guillo-cta">{cta}</span>
         </button>
         <div className="guillo-aux">
           {targeting && <button className="btn small" onClick={game.cancelTarget}>Cancel</button>}
