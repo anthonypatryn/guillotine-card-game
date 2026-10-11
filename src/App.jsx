@@ -998,9 +998,9 @@ function HelpSheet({ close, reduce, setReduce }) {
 // localStorage so the exact placement can be baked into the CSS.
 const NUMPOS_KEY = 'guillotine-numpos';
 const NUMPOS_DEFAULTS = {
-  head:   { x: 50, y: 37, f: 40 },   // f = font size as % of box height
-  basket: { x: 50, y: 24, f: 33 },
-  hand:   { x: 50, y: 50, f: 38 },
+  head:   { x: 47.2, y: 41.9, f: 40 },   // f = font size as % of box height
+  basket: { x: 47.1, y: 31.8, f: 33 },
+  hand:   { x: 48.4, y: 47, f: 38 },
 };
 function DragNum({ value, pos, setPos, boxH, dark }) {
   const onDown = (e) => {

@@ -1177,3 +1177,26 @@
   padding: 8px 12px; display: block; max-width: 560px; margin: 20px auto 12px; color: var(--cream);
   font-size: 12px; overflow-x: auto; }
 .ce-btns { display: flex; gap: 10px; justify-content: center; }
+
+/* ===== number positions dialed in via the card editor (/?view=cardedit) =====
+   container-type: size lets the font (cqh = % of box height) scale in every
+   context the art appears at. Values from the editor. */
+.headscore { container-type: size; }
+.bpip { container-type: size; }
+.hand-stack { container-type: size; }
+.hs-num,
+.pc-top .headscore .hs-num,
+.go-score .hs-num,
+.notice-score .hs-num {
+  left: 47.2%; right: auto; top: 41.9%; transform: translate(-50%, -50%);
+  font-size: 40cqh; width: auto; text-align: center;
+}
+.bpip-ct,
+.pc-baskets .bpip-ct {
+  left: 47.1%; right: auto; top: 31.8%; bottom: auto; transform: translate(-50%, -50%);
+  font-size: 33cqh;
+}
+.hand-stack-ct {
+  inset: auto; left: 48.4%; top: 47%; transform: translate(-50%, -50%);
+  font-size: 38cqh; display: block; padding: 0; width: auto;
+}
