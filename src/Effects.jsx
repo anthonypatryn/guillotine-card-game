@@ -43,7 +43,7 @@ export function SliceFlier({ flier, onDone }) {
   useLayoutEffect(() => {
     const dx = to.x - from.x, dy = to.y - from.y;
     const sx = 8 + rng(uid + 3) * 8, sy = 16 + rng(uid + 5) * 10;
-    const dur = _reduce ? 1 : 840;
+    const dur = _reduce ? 1 : 1500;
     const opt = { duration: dur, easing: 'cubic-bezier(.35,.1,.25,1)', fill: 'forwards' };
     // 0–.14 = anticipation (the card presses down), .28 = the cut, then tumble to the pile.
     const aTop = topRef.current.animate([
@@ -98,7 +98,7 @@ export function BloodSplatter({ splat, onDone }) {
       { opacity: .95, transform: 'scale(1.07)', offset: .1 },
       { opacity: .88, transform: 'scale(1)', offset: .5 },
       { opacity: 0, transform: 'scale(1.03)' },
-    ], { duration: 900, easing: 'ease-out', fill: 'forwards' });
+    ], { duration: 1500, easing: 'ease-out', fill: 'forwards' });
     a.onfinish = onDone;
     return () => a.cancel();
   }, []);
@@ -155,7 +155,7 @@ export function DealFlier({ deal, onDone }) {
       { opacity: 1, offset: .14 },
       { transform: `translate(${dx * 0.5}px,${dy * 0.5 - 26}px) scale(1.02) rotate(3deg)`, opacity: 1, offset: .55 },
       { transform: `translate(${dx}px,${dy}px) scale(.78) rotate(0)`, opacity: 0, offset: 1 },
-    ], { duration: 470, delay, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'backwards' });
+    ], { duration: 820, delay, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'backwards' });
     a.onfinish = onDone;
     return () => a.cancel();
   }, []);

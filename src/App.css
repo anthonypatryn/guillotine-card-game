@@ -927,8 +927,8 @@
 
 /* the blade drops into the lunette and springs back on every behead */
 .guillo-blade { animation: bladeDrop .55s cubic-bezier(.4, 0, .55, 1); }
-@keyframes bladeDrop { 0% { transform: translateY(0); } 42% { transform: translateY(42px); }
-  66% { transform: translateY(42px); } 100% { transform: translateY(0); } }
+@keyframes bladeDrop { 0% { transform: translateY(0); } 42% { transform: translateY(54px); }
+  64% { transform: translateY(54px); } 100% { transform: translateY(0); } }
 [data-reduce="1"] .guillo-blade { animation: none; }
 
 /* day transition: one colour per day + ghosted 45° fleur-de-lis pattern */
@@ -1023,3 +1023,86 @@
 .mp-seek::-moz-range-thumb, .mp-vol::-moz-range-thumb {
   width: 10px; height: 10px; border: 1px solid var(--gold); border-radius: 50%; background: var(--cream); cursor: pointer; }
 .topbar { flex-wrap: wrap; }
+
+/* =================================================================
+   Red-carpet line, decks beside the line, guillotine-as-button,
+   bigger cards, calmer (slower) animations
+   ================================================================= */
+
+/* plush red-carpet runner, built from CSS gradients (no raster) — gold-trimmed,
+   with a vertical pile texture + sheen; fixed height so it never resizes */
+.line-area {
+  display: flex; align-items: center; gap: 10px; min-height: 178px; padding: 10px 12px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.07), transparent 20%, transparent 72%, rgba(0,0,0,.38)),
+    repeating-linear-gradient(90deg, rgba(255,235,235,.035) 0 2px, rgba(0,0,0,.055) 2px 5px),
+    linear-gradient(90deg, #560d15, #7d1622 10%, #8a1b29 50%, #7d1622 90%, #560d15);
+  border-top: 3px solid #b8903a; border-bottom: 3px solid #b8903a;
+  border-left: 1px solid #3a0a11; border-right: 1px solid #3a0a11; border-radius: 6px;
+  box-shadow: inset 0 0 36px rgba(0,0,0,.55);
+}
+.line-area .line-scroll { flex: 1; align-items: center; }
+
+/* draw piles beside the line, same size as the cards */
+.decks-col { display: flex; gap: 8px; flex: 0 0 auto; }
+.deck-pile { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 0 0 auto; }
+.deck-pile-stack { position: relative; display: inline-block; width: 76px; height: 108px; }
+.deck-pile-stack img { width: 76px; height: 108px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(0,0,0,.55);
+  box-shadow: 3px 3px 0 rgba(0,0,0,.33), 5px 5px 0 rgba(0,0,0,.2), 0 5px 10px rgba(0,0,0,.4); }
+.deck-pile-ct { position: absolute; bottom: -5px; right: -7px; background: var(--accent); color: #fff;
+  border: 1px solid var(--gold); border-radius: 11px; font-family: var(--font-head); font-size: 12px; padding: 1px 7px; }
+.deck-pile-label { font-family: var(--font-head); font-size: 10px; color: var(--cream);
+  text-shadow: 0 1px 2px #000; letter-spacing: .5px; }
+
+/* the guillotine itself is the behead button */
+.guillo-col { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
+.guillo-btn { background: transparent; border: none; padding: 0; cursor: default;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.guillo-btn.live { cursor: pointer; }
+.guillo { width: 112px; height: auto; filter: drop-shadow(0 3px 6px rgba(0,0,0,.6)); transition: filter .18s, transform .18s; }
+.guillo-btn.live:hover .guillo { filter: drop-shadow(0 0 11px rgba(201,162,39,.85)); transform: translateY(-1px); }
+.guillo-btn.pulse .guillo { animation: guilloPulse 1.8s ease-in-out infinite; }
+@keyframes guilloPulse {
+  0%, 100% { filter: drop-shadow(0 3px 6px rgba(0,0,0,.6)); }
+  50% { filter: drop-shadow(0 0 13px rgba(201,162,39,.9)); }
+}
+.guillo-cta { font-family: var(--font-head); font-size: 12px; color: var(--gold); text-shadow: 0 1px 2px #000;
+  min-height: 15px; white-space: nowrap; text-align: center; }
+.guillo-btn.live .guillo-cta { color: #ffe9a8; }
+.guillo-aux { display: flex; gap: 6px; align-items: center; min-height: 26px; }
+.btn.small { font-size: 11px; padding: 4px 10px; }
+
+/* everything a smidge bigger pre-zoom */
+.noble-card.token { width: 76px; height: 108px; }
+.noble-card.token .front-tag { font-size: 9px; }
+.dock-card { width: 104px; height: 148px; }
+.pc-front { width: 34px; height: 48px; }
+.sliced-thumb.pile-card { width: 92px; height: 130px; }
+
+/* calmer animations (roughly half speed) */
+.guillo-blade { animation-duration: 1s; }
+.modal { animation: popIn2 .36s cubic-bezier(.2, .8, .25, 1); }
+.hovercard.center { animation-duration: .22s; }
+.day-clock { animation-duration: 2.6s; }
+.callout { animation-duration: 2.6s; }
+
+/* ===== art review page (/?view=art) ===== */
+.art-review { max-width: 1040px; margin: 0 auto; padding: 24px 18px 70px; }
+.ar-head { text-align: center; margin-bottom: 10px; }
+.ar-logo { width: min(80vw, 360px); height: auto; }
+.ar-head h1 { font-family: var(--font-display); color: var(--accent-bright); font-size: 34px; margin: 10px 0 4px; }
+.ar-head p { max-width: 580px; margin: 0 auto; }
+.art-review h2 { font-family: var(--font-head); color: var(--gold); font-size: 20px;
+  border-bottom: 1px solid var(--panel-light); padding-bottom: 6px; margin: 28px 0 14px; }
+.art-grid { display: flex; flex-wrap: wrap; gap: 16px; }
+.art-tile { margin: 0; }
+.art-swatches { display: flex; border-radius: 10px; overflow: hidden; border: 1px solid var(--panel-light);
+  box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+.art-sw { display: flex; align-items: center; justify-content: center; width: 120px; height: 120px; padding: 8px; box-sizing: border-box; }
+.art-sw.dark { background: #17120f; }
+.art-sw.light { background: #efe6d4; }
+.art-tile.wide .art-sw { width: 248px; }
+.art-sw .guillo-wrap { transform: scale(.78); }
+.art-tile figcaption { text-align: center; font-family: var(--font-head); font-size: 12px; color: var(--muted);
+  margin-top: 6px; text-transform: capitalize; }
+.ar-foot { text-align: center; margin-top: 36px; letter-spacing: 2px; }

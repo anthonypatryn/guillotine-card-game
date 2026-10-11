@@ -113,20 +113,14 @@ export default function App() {
   // Drive computer players in two beats: play a card, then (after a pause) behead.
   useEffect(() => {
     if (G.phase !== 'playing' || !G.cpu?.[G.current]) return;
-    const t = setTimeout(() => { if (G.actionPlayed) game.collectAndEnd(); else game.cpuPlay(); }, Math.round(900 / speed));
+    const t = setTimeout(() => { if (G.actionPlayed) game.collectAndEnd(); else game.cpuPlay(); }, Math.round(1300 / speed));
     return () => clearTimeout(t);
   }, [G.phase, G.current, G.day, G.actionPlayed, speed]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Human: once your action has fully resolved (and didn't grant a second
-  // action), the behead is automatic — collecting the front noble is mandatory.
-  useEffect(() => {
-    if (G.phase !== 'playing' || G.cpu?.[G.current] || !G.actionPlayed) return;
-    const t = setTimeout(() => game.collectAndEnd(), Math.round(720 / speed));
-    return () => clearTimeout(t);
-  }, [G.phase, G.current, G.day, G.actionPlayed, speed]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'bugs')
-    return <div className="app"><BugViewer /></div>;
+  const view = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('view') : null;
+  if (view === 'bugs') return <div className="app"><BugViewer /></div>;
+  if (view === 'art') return <div className="app"><ArtReview /></div>;
 
   return (
     <div className="app">
@@ -317,9 +311,14 @@ function BasketPip({ colorKey, count, title }) {
 
 function Fleur({ className }) {
   return (
-    <svg className={className} viewBox="0 0 24 30" aria-hidden="true">
-      <path fill="currentColor" d="M12 1c-1.3 2.4-1.3 4.6 0 6.6 1.3-2 1.3-4.2 0-6.6z
-        M11.3 8.4C8 5.9 4.6 7 4.2 10.3c-.3 2.6 1.7 4.4 4.6 4.3-1.9.9-2.9 2.4-2.3 4h2.1c-.2-.9.3-1.7 1.2-2v4.1H7.6v1.8h2.2v3.2C8.4 29 7.2 28.4 6.4 27c.6 2.1 2.6 3.2 5.6 3.2s5-1.1 5.6-3.2c-.8 1.4-2 2-3.4 1.7v-3.2h2.2v-1.8h-2.2v-4.1c.9.3 1.4 1.1 1.2 2h2.1c.6-1.6-.4-3.1-2.3-4 2.9.1 4.9-1.7 4.6-4.3C19.4 7 16 5.9 12.7 8.4c.5-.9.5-2 0-2.9-.5.9-.5 2 0 2.9-.4-.3-.9-.3-1.4 0z"/>
+    <svg className={className} viewBox="0 0 120 96" aria-hidden="true">
+      <g fill="currentColor">
+        <path d="M60 5 C52 24 52 45 60 62 C68 45 68 24 60 5 Z" />
+        <path d="M60 60 C45 51 31 39 29 21 C45 25 57 42 60 60 Z" />
+        <path d="M60 60 C75 51 89 39 91 21 C75 25 63 42 60 60 Z" />
+        <rect x="45" y="60" width="30" height="9" rx="2.5" />
+        <path d="M55 69 H65 L69 88 C69 93 51 93 51 88 Z" />
+      </g>
     </svg>
   );
 }
@@ -449,7 +448,7 @@ function Board({ game }) {
       const from = { x: nd.left + nd.width / 2, y: nd.top + nd.height / 2 };
       Object.values(lineRects.current).forEach((r, i) => {
         add.push({ key: `nd-${G.day}-${i}-${seen.current}`, back: NOBLE_BACK, from,
-          to: { x: r.left + r.width / 2, y: r.top + r.height / 2 }, delay: i * 55 });
+          to: { x: r.left + r.width / 2, y: r.top + r.height / 2 }, delay: i * 95 });
       });
     }
     const curHand = G.players[G.current]?.hand.length ?? 0;
@@ -460,7 +459,7 @@ function Board({ game }) {
         const from = { x: ad.left + ad.width / 2, y: ad.top + ad.height / 2 };
         const k = Math.min(curHand - prevHandLen.current, 6);
         for (let i = 0; i < k; i++) add.push({ key: `ad-${G.current}-${curHand}-${i}`, back: ACTION_BACK, from,
-          to: { x: dr.left + dr.width * (0.3 + 0.4 * Math.random()), y: dr.top + dr.height / 2 }, delay: i * 70 });
+          to: { x: dr.left + dr.width * (0.3 + 0.4 * Math.random()), y: dr.top + dr.height / 2 }, delay: i * 110 });
       }
     }
     prevDay.current = G.day; prevLine.current = G.line.length; prevHandLen.current = curHand;
@@ -482,7 +481,6 @@ function Board({ game }) {
       <main className="field">
         <div className="field-msg">
           <span className="message">{G.message}</span>
-          <Decks G={G} />
         </div>
         <TurnSteps G={G} />
         {locks.length > 0 && <div className="locks">{locks.map((l, i) => <span key={i} className="lock-chip">{l}</span>)}</div>}
@@ -640,7 +638,7 @@ function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint }
       if (!prev || !el) return;
       const dx = prev.l - pos.l, dy = prev.t - pos.t;
       if (dx || dy) el.animate([{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'translate(0,0)' }],
-        { duration: 340, easing: 'cubic-bezier(.45,0,.35,1)' });
+        { duration: 600, easing: 'cubic-bezier(.45,0,.35,1)' });
     });
     prevOffsets.current = next;
   }, [G.line]);
@@ -651,8 +649,14 @@ function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint }
     if (el) el.scrollLeft = el.scrollWidth;
   }, [G.line.length, G.phase]);
 
+  const canBehead = G.phase === 'playing' && !targeting && !G.cpu?.[G.current];
+  const cta = G.line.length === 0 ? 'End turn' : 'Off with their head!';
   return (
     <div className="line-area">
+      <div className="decks-col">
+        <DeckPile kind="noble" count={G.nobleDeck.length} label="Nobles" />
+        <DeckPile kind="action" count={G.actionDeck.length} label="Actions" />
+      </div>
       <div className="line-scroll" ref={scrollRef}>
         {display.length === 0 && <div className="line-empty">The line is empty.</div>}
         {display.map(({ inst, idx }) => {
@@ -677,17 +681,15 @@ function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint }
         })}
       </div>
       <div className="guillo-col">
-        <Guillotine drop={drop} />
-        <div className="guillo-actions">
-          {!targeting && !G.actionPlayed && !G.cpu?.[G.current] && (
-            <button className={'btn primary behead-btn' + (G.line.length > 0 ? ' pulse' : '')}
-              onClick={game.collectAndEnd}>
-              {G.line.length > 0 && <img className="behead-blade" src="/art/blade.svg" alt="" />}
-              <span>{G.line.length === 0 ? 'End turn →' : 'Off with their head!'}</span>
-            </button>
-          )}
-          {targeting && <button className="btn" onClick={game.cancelTarget}>Cancel</button>}
-          {game.canUndo() && <button className="btn undo-btn" onClick={game.undo}>↶ Undo</button>}
+        <button className={'guillo-btn' + (canBehead ? ' live' : '') + (canBehead && G.line.length > 0 ? ' pulse' : '')}
+          onClick={canBehead ? game.collectAndEnd : undefined} disabled={!canBehead}
+          title={canBehead ? cta : 'The guillotine'}>
+          <Guillotine drop={drop} />
+          <span className="guillo-cta">{canBehead ? cta : ' '}</span>
+        </button>
+        <div className="guillo-aux">
+          {targeting && <button className="btn small" onClick={game.cancelTarget}>Cancel</button>}
+          {game.canUndo() && <button className="btn small" onClick={game.undo}>↶ Undo</button>}
         </div>
       </div>
     </div>
@@ -746,23 +748,20 @@ function Guillotine({ drop = 0 }) {
         <path d="M58 112h33l-3.5 12a2 2 0 0 1-2 1.5H63.5a2 2 0 0 1-2-1.5z" fill="#8a6a3f" stroke="#5a4330" strokeWidth="1" />
         <path d="M60 117h29M61 121h27" stroke="rgba(0,0,0,.2)" strokeWidth="0.8" />
       </svg>
-      <span className="guillo-label">GUILLOTINE</span>
     </div>
   );
 }
 
-// ─── The two draw piles (nobles + actions), cards deal out from here ─────────
-function Decks({ G }) {
+// ─── A draw pile beside the line (card-sized); cards deal out from here ───────
+function DeckPile({ kind, count, label }) {
+  const back = kind === 'noble' ? NOBLE_BACK : ACTION_BACK;
   return (
-    <div className="decks">
-      <div className="deck" data-deck="noble" title="Noble draw pile">
-        <span className="deck-stack"><img src={NOBLE_BACK} alt="" /><span className="deck-ct">{G.nobleDeck.length}</span></span>
-        <span className="deck-label">Nobles</span>
-      </div>
-      <div className="deck" data-deck="action" title="Action draw pile">
-        <span className="deck-stack"><img src={ACTION_BACK} alt="" /><span className="deck-ct">{G.actionDeck.length}</span></span>
-        <span className="deck-label">Actions</span>
-      </div>
+    <div className="deck-pile" data-deck={kind} title={`${label} draw pile — ${count} left`}>
+      <span className="deck-pile-stack">
+        <img src={back} alt="" />
+        <span className="deck-pile-ct">{count}</span>
+      </span>
+      <span className="deck-pile-label">{label}</span>
     </div>
   );
 }
@@ -979,6 +978,77 @@ function HelpSheet({ close, reduce, setReduce }) {
         </div>
         <button className="btn primary" onClick={close}>Got it</button>
       </div>
+    </div>
+  );
+}
+
+// ─── Art review page (/?view=art) — gallery for approving assets ─────────────
+function ArtTile({ src, label, node, size = 96, wide }) {
+  const content = node || <img src={src} alt={label} style={{ maxWidth: size, maxHeight: size, display: 'block' }} />;
+  return (
+    <figure className={'art-tile' + (wide ? ' wide' : '')}>
+      <div className="art-swatches">
+        <span className="art-sw dark">{content}</span>
+        <span className="art-sw light">{content}</span>
+      </div>
+      <figcaption>{label}</figcaption>
+    </figure>
+  );
+}
+function ArtReview() {
+  const COLORSET = ['red', 'blue', 'green', 'gray', 'purple'];
+  return (
+    <div className="art-review">
+      <header className="ar-head">
+        <img className="ar-logo" src="/logo-title.png" alt="Guillotine" />
+        <h1>Art Review</h1>
+        <p className="muted">Each asset is shown on dark &amp; light. Tell me which fleur (A–D) to approve, and flag anything to fix.</p>
+      </header>
+
+      <section>
+        <h2>Fleur-de-lis — pick one</h2>
+        <div className="art-grid">
+          <ArtTile src="/art/fleur-gold.svg" label="A · Gold" />
+          <ArtTile src="/art/fleur-silver.svg" label="B · Silver" />
+          <ArtTile src="/art/fleur-antique.svg" label="C · Antique" />
+          <ArtTile src="/art/fleur-polished.svg" label="D · Polished" />
+          <ArtTile src="/art/fleur.svg" label="Current (in use)" />
+        </div>
+      </section>
+
+      <section>
+        <h2>Logo &amp; guillotine</h2>
+        <div className="art-grid">
+          <ArtTile src="/logo-title.png" label="Logo wordmark" size={220} wide />
+          <ArtTile node={<Guillotine />} label="Guillotine" />
+          <ArtTile src="/art/blade.svg" label="Blade" />
+          <ArtTile src="/art/head.svg" label="Head · points" />
+        </div>
+      </section>
+
+      <section>
+        <h2>Faction baskets</h2>
+        <div className="art-grid">
+          {COLORSET.map(c => <ArtTile key={c} src={`/art/basket-${c}.svg`} label={`${c} · ${FACTION[c].title}`} />)}
+        </div>
+      </section>
+
+      <section>
+        <h2>Faction symbols</h2>
+        <div className="art-grid">
+          {COLORSET.map(c => <ArtTile key={c} src={`/art/symbol-${c}.svg`} label={FACTION[c].title} size={60} />)}
+        </div>
+      </section>
+
+      <section>
+        <h2>Card backs</h2>
+        <div className="art-grid">
+          <ArtTile src="/cards/nobles/back.webp" label="Noble back" size={120} />
+          <ArtTile src="/cards/actions/back.png" label="Action back" size={120} />
+        </div>
+      </section>
+
+      <p className="ar-foot muted">— end of review —</p>
     </div>
   );
 }
