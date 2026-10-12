@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="78%">
+      <stop offset="0" stop-color="#8a1f29"/>
+      <stop offset="60%" stop-color="#4a1115"/>
+      <stop offset="100%" stop-color="#17110c"/>
+    </radialGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5a4330"/><stop offset=".5" stop-color="#7a5a3c"/><stop offset="1" stop-color="#43321f"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="1" y2=".4">
+      <stop offset="0" stop-color="#8f9398"/><stop offset=".32" stop-color="#eef0f1"/>
+      <stop offset=".62" stop-color="#9a9ea2"/><stop offset="1" stop-color="#5f6164"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f1d98a"/><stop offset=".5" stop-color="#caa64a"/><stop offset="1" stop-color="#7e5f1e"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- ghosted fleur-de-lis watermark -->
+  <g fill="#c8a24a" opacity="0.07">
+    <path d="M256 70c10 20 10 34 0 48-10-14-10-28 0-48zm0 44c20 6 30 22 24 44-14-6-24-20-24-44zm0 0c-20 6-30 22-24 44 14-6 24-20 24-44z"/>
+  </g>
+
+  <!-- platform / scaffold -->
+  <polygon points="118,392 394,392 418,428 94,428" fill="#79593c" stroke="#2c2015" stroke-width="4"/>
+  <rect x="94" y="428" width="324" height="40" fill="#5a4330" stroke="#2c2015" stroke-width="4"/>
+
+  <!-- uprights -->
+  <rect x="150" y="96" width="34" height="306" rx="4" fill="url(#wood)" stroke="#2c2015" stroke-width="4"/>
+  <rect x="328" y="96" width="34" height="306" rx="4" fill="url(#wood)" stroke="#2c2015" stroke-width="4"/>
+  <!-- crossbeam -->
+  <rect x="134" y="78" width="244" height="40" rx="6" fill="url(#wood)" stroke="#2c2015" stroke-width="4"/>
+
+  <!-- blade carriage (angled steel + wooden stock) -->
+  <g>
+    <rect x="156" y="150" width="200" height="54" rx="6" fill="#4c3612" stroke="#2c2015" stroke-width="4"/>
+    <circle cx="190" cy="177" r="8" fill="url(#gold)"/>
+    <circle cx="256" cy="177" r="8" fill="url(#gold)"/>
+    <circle cx="322" cy="177" r="8" fill="url(#gold)"/>
+    <polygon points="160,206 352,206 352,268 160,290" fill="url(#steel)" stroke="#45484b" stroke-width="3"/>
+    <polygon points="160,276 352,262 352,268 160,290" fill="#fff" opacity=".7"/>
+  </g>
+
+  <!-- lunette (neck hole) -->
+  <circle cx="256" cy="344" r="40" fill="#120c08"/>
+  <path d="M218 344a38 38 0 0 1 76 0" fill="none" stroke="url(#gold)" stroke-width="9"/>
+
+  <!-- gold head in the basket — "win by getting a head" -->
+  <g transform="translate(256,372)">
+    <path d="M-34 44c0-26 15-46 34-46s34 20 34 46z" fill="url(#gold)"/>
+    <circle cx="0" cy="6" r="22" fill="url(#gold)"/>
+  </g>
+</svg>
