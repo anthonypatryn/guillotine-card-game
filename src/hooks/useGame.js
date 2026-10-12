@@ -52,6 +52,9 @@ function fresh() {
 
 let logSeed = 0;
 const logEntry = (kind, text, data = {}) => ({ id: ++logSeed, kind, text, ...data });
+// After loading a saved/synced game, advance logSeed past the highest existing
+// log id so new entries never reuse an id (which would collide as a React key).
+const reseedLog = (log) => { for (const e of log || []) if (e?.id > logSeed) logSeed = e.id; };
 const LOG_MAX = 60;
 const pushLog = (log, ...entries) => [...log, ...entries].slice(-LOG_MAX);
 
@@ -232,7 +235,7 @@ export function useGame() {
       : { ...prev, cpu: prev.cpu.map((v, i) => (i === seat ? !!isCpu : v)) });
   }, []);
   // Resume: drop a whole saved state in (host reload / local resume).
-  const load = useCallback((saved) => { if (saved && saved.players) { past.current = []; setG(saved); } }, []);
+  const load = useCallback((saved) => { if (saved && saved.players) { past.current = []; reseedLog(saved.log); setG(saved); } }, []);
 
   return {
     G, start, restart, beginTurn, advanceFromPass: beginTurn,
