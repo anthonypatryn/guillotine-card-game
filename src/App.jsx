@@ -104,7 +104,7 @@ export default function App() {
   // Drive computer players in two beats: play a card, then (after a pause) behead.
   useEffect(() => {
     if (G.phase !== 'playing' || !G.cpu?.[G.current]) return;
-    const t = setTimeout(() => { if (G.actionPlayed) game.collectAndEnd(); else game.cpuPlay(); }, Math.round(1300 / speed));
+    const t = setTimeout(() => { if (G.actionPlayed) game.collectAndEnd(); else game.cpuPlay(); }, Math.round(1900 / speed));
     return () => clearTimeout(t);
   }, [G.phase, G.current, G.day, G.actionPlayed, speed]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -118,12 +118,16 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <ShineLogo className="topbar-logo" />
-        <span className="tagline">win by getting a head</span>
-        <button className="nav-btn" onClick={() => setShowHelp(true)} title="How to play">?</button>
-        <button className="nav-btn" onClick={toggleSpeed} title="CPU speed">{speed}×</button>
-        <button className="nav-btn theme-btn" onClick={() => setShowTheme(true)} title="Theme &amp; fonts">Aa</button>
-        <MusicPlayer />
+        <span className="tb-left">
+          <ShineLogo className="topbar-logo" />
+          <span className="tagline">win by getting a head</span>
+        </span>
+        <span className="tb-center">
+          <button className="nav-btn" onClick={() => setShowHelp(true)} title="How to play">?</button>
+          <button className="nav-btn" onClick={toggleSpeed} title="CPU speed">{speed}×</button>
+          <button className="nav-btn theme-btn" onClick={() => setShowTheme(true)} title="Theme &amp; fonts">Aa</button>
+        </span>
+        <span className="tb-right"><MusicPlayer /></span>
       </header>
       {showTheme && <ThemeSheet theme={theme} setTheme={setTheme} close={() => setShowTheme(false)} />}
       {showHelp && <HelpSheet close={() => setShowHelp(false)} reduce={reduce} setReduce={setReduceState} />}
@@ -249,7 +253,10 @@ function StartScreen({ onStart, onOnline, onResume }) {
         {onOnline && <button className="btn start-btn online-btn" onClick={onOnline}>Play Online →</button>}
       </div>
       <p className="muted small resist-note">CPU players are code-named Résistants — set each one's nerve from Recrue to Maquisard. Or play online with friends.</p>
-      <a className="hof-link" href="?view=stats">Hall of Fame →</a>
+      <div className="start-links">
+        <a className="hof-link" href="?view=stats">Hall of Fame →</a>
+        <a className="hof-link" href="?view=bugs">Bug reports (PIN) →</a>
+      </div>
     </div>
   );
 }
@@ -466,7 +473,8 @@ function Board({ game }) {
   const [confirmNew, setConfirmNew] = useState(false);
   const [turnCue, setTurnCue] = useState(false);
   const [linePreview, setLinePreview] = useState(null);
-  const [cardOpen, setCardOpen] = useState(null); // index of the hand card shown in the lightbox
+  const [cardOpen, setCardOpen] = useState(null);   // hand-card index open in the viewer
+  const [nobleOpen, setNobleOpen] = useState(null); // line-noble index open in the viewer
   const seen = useRef(0);
 
   // Points leader (unique leader with >0, else none — don't crown a 0–0 tie).
@@ -478,6 +486,13 @@ function Board({ game }) {
   // Who is viewing (local hotseat: the active seat; online: this client's seat).
   const viewerIdx = game.seat != null ? game.seat : G.current;
   const myTurn = G.phase === 'playing' && !G.cpu?.[G.current] && G.current === viewerIdx;
+  // "My" seat for the hand dock — so your hand stays visible between turns. Online
+  // it's your seat; local solo it's the sole human; otherwise the active human.
+  const curIsMineHuman = !G.cpu?.[G.current] && (game.seat == null || G.current === game.seat);
+  const mySeat = game.seat != null ? game.seat
+    : (G.cpu.filter((c) => !c).length === 1 ? G.cpu.findIndex((c) => !c) : null);
+  const handSeat = curIsMineHuman ? G.current : mySeat;
+  const handPlayable = handSeat != null && handSeat === G.current && curIsMineHuman && G.phase === 'playing';
   const lineRects = useRef({});
   const deckRects = useRef({});
   const prevDay = useRef(0);
@@ -525,19 +540,26 @@ function Board({ game }) {
   // auto-clear the callout
   useEffect(() => {
     if (!callout) return;
-    const t = setTimeout(() => setCallout(null), 1900);
+    const t = setTimeout(() => setCallout(null), 3300);
     return () => clearTimeout(t);
   }, [callout]);
 
-  // Drop any lingering result-preview / open card when the board state moves on.
-  useEffect(() => { setLinePreview(null); setCardOpen(null); }, [G.line, G.phase, G.current]);
+  // Clear the hover result-preview whenever the board moves on.
+  useEffect(() => { setLinePreview(null); }, [G.line, G.phase, G.current]);
+  // Close the noble viewer when the line changes (indices would shift).
+  useEffect(() => { setNobleOpen(null); }, [G.line]);
+  // Keep the hand viewer across turns (so you can study), but close it if its
+  // index is no longer valid for the hand being shown.
+  useEffect(() => {
+    if (cardOpen != null && (handSeat == null || cardOpen >= (G.players[handSeat]?.hand.length ?? 0))) setCardOpen(null);
+  }, [cardOpen, handSeat, G.players]);
 
   // Flash a "Your turn" cue when control lands on the viewer (esp. useful online
   // and in hotseat, where it's easy to miss the handoff).
   useEffect(() => {
     if (!myTurn) return;
     setTurnCue(true);
-    const t = setTimeout(() => setTurnCue(false), 1400);
+    const t = setTimeout(() => setTurnCue(false), 2100);
     return () => clearTimeout(t);
   }, [myTurn, G.current, G.day]);
 
@@ -547,7 +569,7 @@ function Board({ game }) {
     const onKey = (e) => {
       const tag = e.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (cardOpen != null) return; // the open card viewer owns the keyboard
+      if (cardOpen != null || nobleOpen != null) return; // an open viewer owns the keyboard
       const canBehead = G.phase === 'playing' && !G.cpu?.[G.current] && G.current === viewerIdx;
       if (e.key === 'Escape') {
         if (G.phase === 'targeting') { game.cancelTarget(); e.preventDefault(); }
@@ -558,10 +580,10 @@ function Board({ game }) {
         game.collectAndEnd(); e.preventDefault(); return;
       }
       if ((e.key === 'u' || e.key === 'U') && game.canUndo()) { game.undo(); e.preventDefault(); return; }
-      // Number keys open that hand card in the viewer (then Space plays it).
-      if (/^[1-9]$/.test(e.key) && G.phase !== 'gameOver' && G.current === viewerIdx && !G.cpu?.[G.current]) {
+      // Number keys open that hand card in the viewer (works between turns too).
+      if (/^[1-9]$/.test(e.key) && handSeat != null) {
         const hi = Number(e.key) - 1;
-        if (hi < G.players[G.current].hand.length) { setCardOpen(hi); e.preventDefault(); }
+        if (hi < G.players[handSeat].hand.length) { setCardOpen(hi); e.preventDefault(); }
       }
     };
     window.addEventListener('keydown', onKey);
@@ -635,9 +657,9 @@ function Board({ game }) {
         </div>
         {locks.length > 0 && <div className="locks">{locks.map((l, i) => <span key={i} className="lock-chip">{l}</span>)}</div>}
 
-        <GuillotineLine game={game} step={step} onPick={game.pick} onInspect={onInspect} targeting={targeting} drop={dropTick} hint={hintUids} preview={linePreview} onPreview={setLinePreview} />
+        <GuillotineLine game={game} step={step} onPick={game.pick} onInspect={onInspect} targeting={targeting} drop={dropTick} hint={hintUids} preview={linePreview} onPreview={setLinePreview} onOpenNoble={setNobleOpen} />
 
-        <HandDock game={game} onOpen={setCardOpen} />
+        <HandDock game={game} seat={handSeat} canPlay={handPlayable} onOpen={setCardOpen} />
       </main>
 
       <aside className="hud2">
@@ -693,8 +715,11 @@ function Board({ game }) {
         {splats.map(s => <BloodSplatter key={s.key} splat={s} onDone={() => setSplats(x => x.filter(y => y.key !== s.key))} />)}
         {fliers.map(f => <SliceFlier key={f.key} flier={f} onDone={() => setFliers(x => x.filter(y => y.key !== f.key))} />)}
       </div>
-      {cardOpen != null && G.current === viewerIdx && !G.cpu?.[G.current] && cardOpen < (G.players[G.current]?.hand.length ?? 0) && (
-        <CardLightbox game={game} hand={G.players[G.current].hand} index={cardOpen} setIndex={setCardOpen} onClose={() => setCardOpen(null)} />
+      {cardOpen != null && handSeat != null && cardOpen < (G.players[handSeat]?.hand.length ?? 0) && (
+        <HandCardViewer game={game} seat={handSeat} canPlay={handPlayable} index={cardOpen} setIndex={setCardOpen} onClose={() => setCardOpen(null)} />
+      )}
+      {nobleOpen != null && nobleOpen < G.line.length && (
+        <NobleViewer game={game} viewer={G.players[viewerIdx]} step={step} index={nobleOpen} setIndex={setNobleOpen} onClose={() => setNobleOpen(null)} />
       )}
       {callout && <Callout callout={callout} />}
       {turnCue && <div className="turn-cue">Your turn</div>}
@@ -798,7 +823,7 @@ function TurnSteps({ G }) {
 }
 
 // ─── The line of nobles + the (top-down) guillotine ─────────────────────────
-function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint, preview, onPreview }) {
+function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint, preview, onPreview, onOpenNoble }) {
   const { G } = game;
   const pendingDef = G.pending ? ACTION_BY_ID[G.pending.defId] : null;
   const scrollRef = useRef(null);
@@ -848,7 +873,7 @@ function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint, 
               data-line-uid={inst.uid}
               className={'noble-card token' + (idx === 0 ? ' front' : '') + (isCand && ordPos < 0 ? ' candidate' : '') + (hint?.has(inst.uid) ? ' affected' : '')}
               style={{ borderColor: COLOR_HEX[def.color] }}
-              onClick={(e) => { if (isCand && ordPos < 0) onPick({ idx }); else onInspect({ ...nobleInspect(def, e.currentTarget, nobleGain(viewer, def)), pinned: true }); }}
+              onClick={() => { if (isCand && ordPos < 0) onPick({ idx }); else onOpenNoble?.(idx); }}
               onMouseEnter={(e) => { onInspect(nobleInspect(def, e.currentTarget, nobleGain(viewer, def)));
                 if (onPreview && isCand && ordPos < 0 && step?.type === 'lineNoble' && pendingDef) onPreview(previewResultLine(G, pendingDef, [{ idx }])); }}
               onMouseLeave={() => { onInspect(null); if (onPreview) onPreview(null); }}
@@ -930,7 +955,15 @@ function Guillotine({ drop = 0 }) {
         <rect x="88" y="12" width="11" height="108" rx="1" fill="#44321f" stroke="#2c2015" strokeWidth="1" />
         {/* top crossbeam */}
         <rect x="44" y="6" width="61" height="13" rx="2" fill="#4f3a26" stroke="#2c2015" strokeWidth="1" />
-        {/* carriage: rope + metallic blade + wooden stock with rivets — drops on behead */}
+        {/* lunette — the neck hole */}
+        <circle cx="74.5" cy="96" r="12" fill="#17110c" />
+        <path d="M63 96a11.5 11.5 0 0 1 23 0" fill="none" stroke="#c6a765" strokeWidth="3" />
+        <path d="M63 96a11.5 11.5 0 0 0 23 0" fill="none" stroke="#8f7236" strokeWidth="3" />
+        {/* basket for the heads */}
+        <path d="M58 112h33l-3.5 12a2 2 0 0 1-2 1.5H63.5a2 2 0 0 1-2-1.5z" fill="#8a6a3f" stroke="#5a4330" strokeWidth="1" />
+        <path d="M60 117h29M61 121h27" stroke="rgba(0,0,0,.2)" strokeWidth="0.8" />
+        {/* carriage: rope + metallic blade + wooden stock with rivets — drops on
+            behead. Drawn LAST so the dropping blade passes IN FRONT of the lunette. */}
         <g className="guillo-blade" key={drop}>
           <line x1="74" y1="10" x2="74" y2="28" stroke="#caa66a" strokeWidth="1.6" />
           <polygon points="52,44 97,44 97,60 52,66" fill="url(#guilloMetal)" stroke="#5c6165" strokeWidth="0.6" />
@@ -942,13 +975,6 @@ function Guillotine({ drop = 0 }) {
           <circle cx="82" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
           <circle cx="94" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
         </g>
-        {/* lunette — the neck hole */}
-        <circle cx="74.5" cy="96" r="12" fill="#17110c" />
-        <path d="M63 96a11.5 11.5 0 0 1 23 0" fill="none" stroke="#c6a765" strokeWidth="3" />
-        <path d="M63 96a11.5 11.5 0 0 0 23 0" fill="none" stroke="#8f7236" strokeWidth="3" />
-        {/* basket for the heads */}
-        <path d="M58 112h33l-3.5 12a2 2 0 0 1-2 1.5H63.5a2 2 0 0 1-2-1.5z" fill="#8a6a3f" stroke="#5a4330" strokeWidth="1" />
-        <path d="M60 117h29M61 121h27" stroke="rgba(0,0,0,.2)" strokeWidth="0.8" />
       </svg>
     </div>
   );
@@ -971,20 +997,22 @@ function DeckPile({ kind, count, label }) {
 // ─── The logged-in player's action-card hand ────────────────────────────────
 // The fanned hand along the bottom. A card is a launcher: tapping it opens the
 // card viewer (CardLightbox) — it never plays straight from the fan.
-function HandDock({ game, onOpen }) {
+// The fanned hand. `seat` is whose hand to show (yours, even between turns, so
+// you can keep studying it); `canPlay` is true only when you may actually play.
+function HandDock({ game, seat, canPlay, onOpen }) {
   const { G } = game;
-  const activeIsMe = game.seat == null || G.current === game.seat;
-  if (G.cpu?.[G.current]) return <div className="hand-dock cpu">{G.players[G.current].name} is thinking…</div>;
-  if (!activeIsMe) return <div className="hand-dock cpu">Waiting for {G.players[G.current].name}…</div>;
-  const hand = G.players[G.current].hand;
+  if (seat == null) return <div className="hand-dock cpu">{G.players[G.current]?.name} is thinking…</div>;
+  const hand = G.players[seat].hand;
   const n = hand.length;
+  const peeking = !canPlay; // showing my hand while it isn't my turn
   return (
-    <div className="hand-dock" style={{ '--n': n }}>
+    <div className={'hand-dock' + (peeking ? ' peek' : '')} style={{ '--n': n }}>
+      {peeking && <div className="hand-peek-note">{G.cpu?.[G.current] ? `${G.players[G.current]?.name} is thinking…` : `${G.players[G.current]?.name}'s turn`} — your hand</div>}
       {hand.map((inst, hi) => {
         const def = ACTION_BY_ID[inst.defId];
-        const playable = game.canPlay(hi);
+        const playable = canPlay && game.canPlay(hi);
         return (
-          <button key={inst.uid} className={'dock-card' + (playable ? ' playable' : ' dim')}
+          <button key={inst.uid} className={'dock-card' + (playable ? ' playable' : (canPlay ? ' dim' : ''))}
             style={{ '--i': hi - (n - 1) / 2 }}
             onClick={() => onOpen(hi)}
             title={`${def.name}\n${def.text}`}>
@@ -1013,11 +1041,11 @@ function useSwipe(onSwipe, { min = 50 } = {}) {
   };
 }
 
-// Full-screen one-card-at-a-time viewer. Cycle with ‹ › arrows, ←/→ keys, or a
-// swipe; Space/Enter plays the focused card. Mirrors Long Shot's CardLightbox.
-function CardLightbox({ game, hand, index, setIndex, onClose }) {
-  const { G } = game;
-  const n = hand.length;
+// Shared full-screen one-at-a-time viewer. Cycle with ‹ › arrows, ←/→ keys, or a
+// swipe (left=next, right=prev, down=close); Space/Enter triggers the bar's
+// primary (.lb-play) button. Mirrors Long Shot's lightbox.
+function Lightbox({ count, index, setIndex, onClose, cardKey, card, bar }) {
+  const n = count;
   const prev = () => setIndex((index - 1 + n) % n);
   const next = () => setIndex((index + 1) % n);
   const swipe = useSwipe((d) => { if (d === 'left') next(); else if (d === 'right') prev(); else if (d === 'down') onClose(); });
@@ -1036,28 +1064,15 @@ function CardLightbox({ game, hand, index, setIndex, onClose }) {
     window.addEventListener('keydown', key, true);
     return () => window.removeEventListener('keydown', key, true);
   }); // re-register each render so the index closure stays fresh
-  const inst = hand[index];
-  if (!inst) return null;
-  const def = ACTION_BY_ID[inst.defId];
-  const playable = game.canPlay(index);
-  const blocked = playable ? null : playBlockReason(G, def);
-  const result = playable && !getStep(def, G, []) ? previewResultLine(G, def, []) : null;
-  const notYou = game.seat != null && G.current !== game.seat;
-  const play = () => { onClose(); game.playCard(index); };
   return (
     <div className="lightbox card-lb" onClick={onClose} {...swipe}>
       <div className="lb-inner" onClick={(e) => e.stopPropagation()}>
-        {n > 1 && <button className="lb-arrow" onClick={prev} aria-label="Previous card">‹</button>}
-        <div className="lb-card" key={inst.uid}><img src={actionImg(def.id)} alt={def.name} /></div>
-        {n > 1 && <button className="lb-arrow" onClick={next} aria-label="Next card">›</button>}
+        {n > 1 && <button className="lb-arrow" onClick={prev} aria-label="Previous">‹</button>}
+        <div className="lb-card" key={cardKey}>{card}</div>
+        {n > 1 && <button className="lb-arrow" onClick={next} aria-label="Next">›</button>}
       </div>
       <div className="lb-bar" onClick={(e) => e.stopPropagation()}>
-        <div className="lb-name">{def.name}</div>
-        <div className="lb-text">{def.text}</div>
-        {result && <LinePreviewStrip preview={result} inline />}
-        {playable
-          ? <button className="btn primary lb-play" onClick={play}>Play this card ▸</button>
-          : <div className="lb-info">{blocked || (notYou ? 'Waiting for your turn.' : 'You can play a card on your turn.')}</div>}
+        {bar}
         <div className="lb-nav">
           <button className="btn" onClick={onClose}>Close</button>
           <span className="lb-count">{index + 1} / {n}</span>
@@ -1065,6 +1080,62 @@ function CardLightbox({ game, hand, index, setIndex, onClose }) {
       </div>
     </div>
   );
+}
+
+// The hand card viewer. `canPlay` gates whether Play is offered (false while
+// peeking between turns — you can still flip through and read).
+function HandCardViewer({ game, seat, canPlay, index, setIndex, onClose }) {
+  const { G } = game;
+  const hand = G.players[seat]?.hand ?? [];
+  const inst = hand[index];
+  if (!inst) return null;
+  const def = ACTION_BY_ID[inst.defId];
+  const canPlayNow = canPlay && game.canPlay(index);
+  const blocked = canPlay && !canPlayNow ? playBlockReason(G, def) : null;
+  const result = canPlayNow && !getStep(def, G, []) ? previewResultLine(G, def, []) : null;
+  const play = () => { onClose(); game.playCard(index); };
+  const bar = (
+    <>
+      <div className="lb-name">{def.name}</div>
+      <div className="lb-text">{def.text}</div>
+      {result && <LinePreviewStrip preview={result} inline />}
+      {canPlayNow
+        ? <button className="btn primary lb-play" onClick={play}>Play this card ▸</button>
+        : <div className="lb-info">{blocked || `It’s ${G.players[G.current]?.name}’s turn — play on yours.`}</div>}
+    </>
+  );
+  return <Lightbox count={hand.length} index={index} setIndex={setIndex} onClose={onClose}
+    cardKey={inst.uid} card={<img src={actionImg(def.id)} alt={def.name} />} bar={bar} />;
+}
+
+// The line-noble viewer — same cycler, showing each noble big with what it's
+// worth to the viewer. During targeting a legal pick gets a "Choose" button.
+function NobleViewer({ game, viewer, step, index, setIndex, onClose }) {
+  const { G } = game;
+  const inst = G.line[index];
+  if (!inst) return null;
+  const def = NOBLE_BY_ID[inst.defId];
+  const gain = nobleGain(viewer, def);
+  const canPick = step && step.type === 'lineNoble' && step.candidates.includes(index);
+  const pick = () => { onClose(); game.pick({ idx: index }); };
+  const bar = (
+    <>
+      <div className="lb-name">{def.name}</div>
+      <div className="lb-faction">{FACTION[def.color].title}{index === 0 ? ' · at the guillotine (next)' : ''}</div>
+      <div className="lb-text">{def.text}</div>
+      {gain && (
+        <div className={'hc-gain' + (gain.delta < 0 ? ' neg' : gain.delta > 0 ? ' pos' : '')}>
+          <span className="hc-gain-val">{gain.delta >= 0 ? '+' : ''}{gain.delta} pts</span>
+          <span className="hc-gain-sub"> if you collect it</span>
+          {gain.note && <div className="hc-gain-note">{gain.note}</div>}
+        </div>
+      )}
+      {canPick && <button className="btn primary lb-play" onClick={pick}>Choose this noble ▸</button>}
+    </>
+  );
+  return <Lightbox count={G.line.length} index={index} setIndex={setIndex} onClose={onClose}
+    cardKey={inst.uid}
+    card={<img src={nobleImg(def.id)} alt={def.name} style={{ border: `3px solid ${COLOR_HEX[def.color]}` }} />} bar={bar} />;
 }
 
 // ─── Expandable view of a player's collected heads ──────────────────────────
@@ -1260,7 +1331,7 @@ function HostShell({ room, speed, onExit, resumeG }) {
   }, [G.phase, G.current, G.day]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (G.phase !== 'playing' || !G.cpu?.[G.current]) return;
-    const t = setTimeout(() => { if (G.actionPlayed) game.collectAndEnd(); else game.cpuPlay(); }, Math.round(1300 / speed));
+    const t = setTimeout(() => { if (G.actionPlayed) game.collectAndEnd(); else game.cpuPlay(); }, Math.round(1900 / speed));
     return () => clearTimeout(t);
   }, [G.phase, G.current, G.day, G.actionPlayed, speed]); // eslint-disable-line react-hooks/exhaustive-deps
   const exit = () => { try { localStorage.removeItem('guillotine-host-save'); } catch { /* ignore */ } onExit(); };
@@ -1423,7 +1494,15 @@ function HelpSheet({ close, reduce, setReduce }) {
             <span><img className="leg-emblem" src="/art/symbol-red.svg" alt="" /> Military</span>
             <span><img className="leg-emblem" src="/art/symbol-purple.svg" alt="" /> Royalty</span>
           </div>
-          <p className="muted small">Watch for combos: Count + Countess, stacking Palace Guards, and negative "good-guy" nobles (Hero, Tragic Figure). Hover any card to see it big.</p>
+          <p className="muted small">Watch for combos: Count + Countess, stacking Palace Guards, and negative "good-guy" nobles (Hero, Tragic Figure). Tap any card to see it big and flip through the rest.</p>
+          <p className="help-factions"><b>Keyboard</b></p>
+          <dl className="help-keys">
+            <dt><kbd>1</kbd>–<kbd>9</kbd></dt><dd>open that hand card</dd>
+            <dt><kbd>‹</kbd> <kbd>›</kbd> / <kbd>←</kbd> <kbd>→</kbd></dt><dd>flip through cards in a viewer</dd>
+            <dt><kbd>Space</kbd></dt><dd>play the open card, or behead the front noble</dd>
+            <dt><kbd>U</kbd></dt><dd>undo this turn’s actions</dd>
+            <dt><kbd>Esc</kbd></dt><dd>close a viewer / cancel targeting</dd>
+          </dl>
           <label className="help-toggle">
             <input type="checkbox" checked={reduce} onChange={e => setReduce(e.target.checked)} />
             Reduce motion (fewer animations)

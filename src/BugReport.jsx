@@ -114,6 +114,7 @@ export default function BugReport({ onClose, context }) {
             <p className="note">Sent along with it: {context ? 'the game’s day, turn and last few log lines, ' : ''}your device and screen size{photos.length ? `, and ${photos.length === 1 ? 'the photo' : 'both photos'}` : ''}.</p>
             {err && <p className="err">{err}</p>}
             <div className="btns"><button type="button" className="btn" onClick={onClose}>Cancel</button><button type="submit" className="btn primary" disabled={busy}>Send it</button></div>
+            <a className="bug-view-link" href="?view=bugs">View submitted reports (PIN) →</a>
           </>
         )}
       </form>

@@ -43,7 +43,7 @@ export function SliceFlier({ flier, onDone }) {
   useLayoutEffect(() => {
     const dx = to.x - from.x, dy = to.y - from.y;
     const sx = 8 + rng(uid + 3) * 8, sy = 16 + rng(uid + 5) * 10;
-    const dur = _reduce ? 1 : 1500;
+    const dur = _reduce ? 1 : 1900;
     const opt = { duration: dur, easing: 'cubic-bezier(.35,.1,.25,1)', fill: 'forwards' };
     // 0–.14 = anticipation (the card presses down), .28 = the cut, then tumble to the pile.
     const aTop = topRef.current.animate([
@@ -84,21 +84,59 @@ export function SliceFlier({ flier, onDone }) {
   );
 }
 
-// A burst of blood on the "camera" — a real splatter PNG, varied each time.
-const BLOOD = ['/blood/b1.png', '/blood/b2.png', '/blood/b3.png', '/blood/b4.png', '/blood/b5.png'];
+// A burst of blood on the "camera" — drawn as SVG so it matches the game's
+// painted look (no photographic PNG). Shape varies deterministically by key:
+// an irregular central mass, a few outward streaks, and scattered droplets.
+const BLOOD_TONES = ['#8a0f14', '#9d141a', '#730d11', '#aa1b20'];
+
+function buildBlood(key) {
+  const R = (n) => rng(key * 3 + n);
+  const cx = 60, cy = 60;
+  // central mass: a clump of overlapping blobs
+  const core = [];
+  const coreN = 5 + Math.floor(R(1) * 3);
+  for (let i = 0; i < coreN; i++) {
+    const ang = R(10 + i) * Math.PI * 2;
+    const d = R(40 + i) * 12;
+    core.push({ x: cx + Math.cos(ang) * d, y: cy + Math.sin(ang) * d,
+      r: 10 + R(70 + i) * 12, t: BLOOD_TONES[Math.floor(R(100 + i) * BLOOD_TONES.length)] });
+  }
+  // streaks: thin shards flung outward
+  const streaks = [];
+  const streakN = 4 + Math.floor(R(2) * 4);
+  for (let i = 0; i < streakN; i++) {
+    const ang = R(130 + i) * Math.PI * 2;
+    const len = 22 + R(160 + i) * 26;
+    const w = 2.5 + R(190 + i) * 4;
+    streaks.push({ ang: ang * 180 / Math.PI, len, w,
+      t: BLOOD_TONES[Math.floor(R(210 + i) * BLOOD_TONES.length)] });
+  }
+  // droplets: scattered dots, smaller the farther out
+  const drops = [];
+  const dropN = 12 + Math.floor(R(3) * 10);
+  for (let i = 0; i < dropN; i++) {
+    const ang = R(300 + i) * Math.PI * 2;
+    const dist = 20 + R(360 + i) * 38;
+    const r = (1 + R(420 + i) * 5) * (1 - dist / 70);
+    if (r < 0.6) continue;
+    drops.push({ x: cx + Math.cos(ang) * dist, y: cy + Math.sin(ang) * dist, r,
+      t: BLOOD_TONES[Math.floor(R(480 + i) * BLOOD_TONES.length)] });
+  }
+  return { core, streaks, drops };
+}
 
 export function BloodSplatter({ splat, onDone }) {
   const ref = useRef(null);
-  const src = useMemo(() => BLOOD[Math.floor(rng(splat.key) * BLOOD.length)], [splat.key]);
+  const b = useMemo(() => buildBlood(splat.key), [splat.key]);
 
   useLayoutEffect(() => {
     if (_reduce) { onDone(); return; }
     const a = ref.current.animate([
-      { opacity: 0, transform: 'scale(.55)' },
-      { opacity: .95, transform: 'scale(1.07)', offset: .1 },
-      { opacity: .88, transform: 'scale(1)', offset: .5 },
-      { opacity: 0, transform: 'scale(1.03)' },
-    ], { duration: 1500, easing: 'ease-out', fill: 'forwards' });
+      { opacity: 0, transform: 'scale(.5)' },
+      { opacity: .96, transform: 'scale(1.09)', offset: .12 },
+      { opacity: .9, transform: 'scale(1)', offset: .5 },
+      { opacity: 0, transform: 'scale(1.04)' },
+    ], { duration: 1800, easing: 'ease-out', fill: 'forwards' });
     a.onfinish = onDone;
     return () => a.cancel();
   }, []);
@@ -106,7 +144,16 @@ export function BloodSplatter({ splat, onDone }) {
   const rot = (rng(splat.key + 1) * 2 - 1) * 180;
   return (
     <div className="blood-wrap" style={{ left: splat.x, top: splat.y, transform: `translate(-50%,-50%) rotate(${rot}deg) scale(${splat.scale})` }}>
-      <img ref={ref} className="blood-img" src={src} alt="" />
+      <svg ref={ref} className="blood-svg" viewBox="0 0 120 120" width="120" height="120" aria-hidden="true">
+        <g>
+          {b.streaks.map((s, i) => (
+            <ellipse key={'s' + i} cx={60 + s.len / 2} cy={60} rx={s.len / 2} ry={s.w}
+              fill={s.t} transform={`rotate(${s.ang} 60 60)`} />
+          ))}
+          {b.core.map((c, i) => <circle key={'c' + i} cx={c.x} cy={c.y} r={c.r} fill={c.t} />)}
+          {b.drops.map((d, i) => <circle key={'d' + i} cx={d.x} cy={d.y} r={d.r} fill={d.t} />)}
+        </g>
+      </svg>
     </div>
   );
 }
@@ -155,7 +202,7 @@ export function DealFlier({ deal, onDone }) {
       { opacity: 1, offset: .14 },
       { transform: `translate(${dx * 0.5}px,${dy * 0.5 - 26}px) scale(1.02) rotate(3deg)`, opacity: 1, offset: .55 },
       { transform: `translate(${dx}px,${dy}px) scale(.78) rotate(0)`, opacity: 0, offset: 1 },
-    ], { duration: 820, delay, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'backwards' });
+    ], { duration: 1100, delay, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'backwards' });
     a.onfinish = onDone;
     return () => a.cancel();
   }, []);

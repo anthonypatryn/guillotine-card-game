@@ -5,12 +5,20 @@
 }
 
 .topbar {
-  display: flex;
-  align-items: baseline;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
   gap: 12px;
   padding: 10px 20px;
   background: linear-gradient(180deg, #3a1410, #1b1410);
   border-bottom: 2px solid var(--accent);
+}
+.tb-left { display: flex; align-items: center; gap: 12px; justify-self: start; min-width: 0; }
+.tb-center { display: flex; align-items: center; gap: 8px; justify-self: center; }
+.tb-right { justify-self: end; }
+@media (max-width: 720px) {
+  .topbar { grid-template-columns: 1fr; justify-items: center; row-gap: 6px; }
+  .tb-left, .tb-center, .tb-right { justify-self: center; }
 }
 .topbar h1 {
   margin: 0;
@@ -357,8 +365,8 @@
   box-shadow: 0 0 12px #fff, 0 0 4px #fff;
 }
 
-.blood-wrap { position: fixed; width: 360px; height: 360px; pointer-events: none; }
-.blood-img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }
+.blood-wrap { position: fixed; width: 360px; height: 360px; pointer-events: none; z-index: 40; }
+.blood-svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); }
 
 /* collected noble shown as two jaunty halves — one logical card */
 .sliced-thumb {
@@ -1085,12 +1093,14 @@
 .pc-front { width: 34px; height: 48px; }
 .sliced-thumb.pile-card { width: 92px; height: 130px; }
 
-/* calmer animations (roughly half speed) */
-.guillo-blade { animation-duration: 1s; }
-.modal { animation: popIn2 .36s cubic-bezier(.2, .8, .25, 1); }
-.hovercard.center { animation-duration: .22s; }
-.day-clock { animation-duration: 2.6s; }
-.callout { animation-duration: 2.6s; }
+/* calmer animations — slowed so things read and the game feels unhurried */
+.guillo-blade { animation-duration: 1.25s; }
+.modal { animation: popIn2 .46s cubic-bezier(.2, .8, .25, 1); }
+.hovercard.center { animation-duration: .34s; }
+.day-clock { animation-duration: 3.4s; }
+.callout { animation-duration: 3.4s; }
+.turn-cue { animation-duration: 2.1s; }
+.lb-card { animation-duration: .34s; }
 
 /* ===== art review page (/?view=art) ===== */
 .art-review { max-width: 1040px; margin: 0 auto; padding: 24px 18px 70px; }
@@ -1526,3 +1536,25 @@
   .lb-arrow { width: 40px; height: 40px; font-size: 32px; }
   .lb-card { width: min(260px, 72vw); }
 }
+
+/* hand peek between turns + noble viewer extras */
+.hand-dock { position: relative; }
+.hand-dock.peek .dock-card { filter: saturate(.9); }
+.hand-peek-note {
+  position: absolute; top: -2px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-head); font-size: 12px; letter-spacing: .5px;
+  color: var(--muted); background: color-mix(in srgb, var(--panel) 80%, transparent);
+  border-radius: 999px; padding: 2px 12px; white-space: nowrap; pointer-events: none; z-index: 2;
+}
+.lb-faction { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-top: -2px; }
+.lb-bar .hc-gain { margin-top: 2px; }
+
+/* start-screen footer links */
+.start-links { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 4px; }
+
+/* help: keyboard shortcuts */
+.help-keys { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 4px 0 8px; font-size: 13px; }
+.help-keys dt { white-space: nowrap; }
+.help-keys dd { margin: 0; color: var(--muted); }
+.help-keys kbd, .coach-list kbd { font-family: var(--font-body); font-size: 11.5px; background: var(--panel-light);
+  border: 1px solid var(--muted); border-radius: 5px; padding: 0 5px; color: var(--ink); }
