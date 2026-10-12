@@ -14,7 +14,7 @@ function bugsApi() {
         for await (const chunk of req) raw += chunk;
         try {
           const body = raw ? JSON.parse(raw) : {};
-          const pin = process.env.BUG_PIN || '1327'; // local default
+          const pin = process.env.BUG_PIN || '1234'; // local dev default (production uses the BUG_PIN env)
           const [status, json] = await handleBugs(makeStore(path.resolve('.data')), req.method, body, req.headers['x-bug-pin'], pin);
           res.statusCode = status;
           res.setHeader('Content-Type', 'application/json');

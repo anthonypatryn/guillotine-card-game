@@ -11,6 +11,8 @@ import { HostRoom, JoinClient, cleanCode } from './net/room';
 import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner, DealFlier, setReduce } from './Effects';
 import { playBehead, playWhoosh, playBell, playSlice, isMuted, toggleMuted } from './sound';
 import { loadTheme, applyTheme, THEME_KEY, ThemeSheet } from './theme';
+import BugReport from './BugReport';
+import BugList from './BugList';
 
 
 // The brand logo with a one-time light sweep (reflection) across its shape.
@@ -31,6 +33,7 @@ export default function App() {
   const [theme, setThemeState] = useState(loadTheme);
   const [showTheme, setShowTheme] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showBug, setShowBug] = useState(false);
   // first-time tutorial: open "How to play" on the very first visit
   useEffect(() => {
     try { if (!localStorage.getItem('guillotine-seen-help')) { setShowHelp(true); localStorage.setItem('guillotine-seen-help', '1'); } } catch { /* ignore */ }
@@ -107,7 +110,7 @@ export default function App() {
 
 
   const view = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('view') : null;
-  if (view === 'bugs') return <div className="app"><BugViewer /></div>;
+  if (view === 'bugs') return <div className="app"><BugList /></div>;
   if (view === 'art') return <div className="app"><ArtReview /></div>;
   if (view === 'cardedit') return <div className="app"><CardEdit /></div>;
   if (view === 'stats') return <div className="app"><StatsView /></div>;
@@ -138,7 +141,12 @@ export default function App() {
           {(G.phase === 'playing' || G.phase === 'targeting' || (G.phase === 'pass' && !needPass)) && <Board game={game} />}
         </>
       )}
-      <BugReport game={game} />
+      <button className="bug-fab" title="Report a bug" onClick={() => setShowBug(true)}><BugIcon className="bug-ico" /></button>
+      {showBug && <BugReport onClose={() => setShowBug(false)} context={{
+        day: G.day, phase: G.phase,
+        players: G.players.map((p, i) => ({ name: p.name, cpu: !!G.cpu?.[i] })),
+        log: (G.log || []).map((l) => l.text),
+      }} />}
       <RotateHint />
     </div>
   );
@@ -1562,98 +1570,6 @@ function ArtReview() {
   );
 }
 
-function BugReport({ game }) {
-  const [open, setOpen] = useState(false);
-  const [what, setWhat] = useState('');
-  const [where, setWhere] = useState('');
-  const [status, setStatus] = useState(null);
-  const submit = async () => {
-    if (!what.trim()) { setStatus('Please say what went wrong.'); return; }
-    const G = game.G;
-    const snap = { day: G.day, phase: G.phase, players: G.players.map(p => p.name), log: (G.log || []).map(l => l.text) };
-    setStatus('Sending…');
-    try {
-      const r = await fetch('/api/bugs', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'bug', what, where, page: location.href, ua: navigator.userAgent, game: snap }),
-      });
-      const j = await r.json();
-      if (r.ok) { setStatus(`Merci! Filed as BUG-${j.no}.`); setWhat(''); setWhere(''); }
-      else setStatus(j.error || 'Could not submit.');
-    } catch { setStatus('Network error.'); }
-  };
-  return (
-    <>
-      <button className="bug-fab" title="Report a bug" onClick={() => { setOpen(true); setStatus(null); }}><BugIcon className="bug-ico" /></button>
-      {open && (
-        <div className="modal-backdrop" onClick={() => setOpen(false)}>
-          <div className="modal bug-modal" onClick={e => e.stopPropagation()}>
-            <p className="modal-title">Report a bug</p>
-            <textarea className="bug-what" placeholder="What went wrong? What did you expect?"
-              value={what} onChange={e => setWhat(e.target.value)} />
-            <input className="bug-where" placeholder="Where in the game? (optional)"
-              value={where} onChange={e => setWhere(e.target.value)} />
-            <div className="muted small">The current day, turn and game log are attached automatically.</div>
-            {status && <div className="bug-status">{status}</div>}
-            <div className="bug-actions">
-              <button className="btn" onClick={() => setOpen(false)}>Close</button>
-              <button className="btn primary" onClick={submit}>Send</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
-function BugViewer() {
-  const [pin, setPin] = useState('');
-  const [bugs, setBugs] = useState(null);
-  const [err, setErr] = useState(null);
-  const load = async () => {
-    try {
-      const r = await fetch('/api/bugs', { headers: { 'x-bug-pin': pin } });
-      const j = await r.json();
-      if (r.ok) { setBugs(j.bugs); setErr(null); } else setErr(j.error);
-    } catch { setErr('Network error.'); }
-  };
-  const act = async (action, no) => {
-    await fetch('/api/bugs', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-bug-pin': pin }, body: JSON.stringify({ action, no }) });
-    load();
-  };
-  if (bugs === null) {
-    return (
-      <div className="screen center">
-        <h2>Bug reports</h2>
-        <input className="bug-where" placeholder="PIN" value={pin}
-          onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && load()} />
-        {err && <div className="bug-status">{err}</div>}
-        <button className="btn primary" onClick={load}>View</button>
-      </div>
-    );
-  }
-  return (
-    <div className="bug-list">
-      <h2>Bug reports ({bugs.length})</h2>
-      {bugs.length === 0 && <p className="muted">No reports yet.</p>}
-      {bugs.map(b => (
-        <div key={b.no} className={'bug-item' + (b.status === 'fixed' ? ' fixed' : '')}>
-          <div className="bi-head"><b>BUG-{b.no}</b> <span className="muted small">{new Date(b.at).toLocaleString()}</span> <span className="bi-status">{b.status}</span></div>
-          <div className="bi-what">{b.what}</div>
-          {b.where && <div className="muted small">where: {b.where}</div>}
-          {b.game && <div className="muted small">day {b.game.day} · {b.game.phase} · {b.game.players?.join(', ')}</div>}
-          {b.game?.log?.length > 0 && <details><summary className="muted small">game log</summary><pre className="bi-log">{b.game.log.join('\n')}</pre></details>}
-          <div className="bi-actions">
-            {b.status !== 'fixed'
-              ? <button className="btn" onClick={() => act('fix', b.no)}>Mark fixed</button>
-              : <button className="btn" onClick={() => act('reopen', b.no)}>Reopen</button>}
-            <button className="btn" onClick={() => act('remove', b.no)}>Delete</button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function PickModal({ title, cards, cancel }) {
   return (
