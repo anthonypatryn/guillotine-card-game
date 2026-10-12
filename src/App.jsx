@@ -6,7 +6,7 @@ import {
   nobleImg, actionImg, NOBLE_BACK, ACTION_BACK,
 } from './data/cards';
 import { computeScore } from './utils/scoring';
-import { judgeBlocks, callousActive, lineNobleCandidates, getStep, canPlayCard, playBlockReason, applyResolved } from './utils/effects';
+import { judgeBlocks, callousActive, getStep, canPlayCard, playBlockReason, applyResolved } from './utils/effects';
 import { HostRoom, JoinClient, cleanCode } from './net/room';
 import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner, DealFlier, setReduce } from './Effects';
 import { playBehead, playWhoosh, playBell, playSlice, isMuted, toggleMuted } from './sound';
@@ -296,27 +296,6 @@ function GameOver({ G, onRestart, record = true }) {
   );
 }
 
-// Touch devices have no hover — a tap opens the pinned preview instead of
-// playing straight away, so you can read the card and confirm with Play.
-const COARSE = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
-
-// Which line nobles an action card would affect right now (for the hover hint).
-function affectedLineUids(def, G) {
-  const line = G.line;
-  if (!def || !line.length) return null;
-  const idxs = new Set();
-  const { family, params } = def;
-  if (family === 'lineMove' || family === 'lineNoble' || family === 'reorder') {
-    try { lineNobleCandidates(def, line).forEach(i => idxs.add(i)); } catch { /* ignore */ }
-  }
-  if (family === 'toFrontEnd') {
-    if (params?.op === 'frontToEnd') idxs.add(0);
-    else if (params?.op === 'anyToFront') line.forEach((_, i) => idxs.add(i));
-  }
-  if (!idxs.size) return null;
-  return new Set([...idxs].map(i => line[i]?.uid).filter(Boolean));
-}
-
 // The resulting line if `def` were applied with `picks` — but ONLY for cards
 // whose outcome is deterministic (no shuffle/random draw), so the preview never
 // lies. Returns { line, movedUid } or null. Powers the "Result" strip.
@@ -487,6 +466,7 @@ function Board({ game }) {
   const [confirmNew, setConfirmNew] = useState(false);
   const [turnCue, setTurnCue] = useState(false);
   const [linePreview, setLinePreview] = useState(null);
+  const [cardOpen, setCardOpen] = useState(null); // index of the hand card shown in the lightbox
   const seen = useRef(0);
 
   // Points leader (unique leader with >0, else none — don't crown a 0–0 tie).
@@ -549,8 +529,8 @@ function Board({ game }) {
     return () => clearTimeout(t);
   }, [callout]);
 
-  // Drop any lingering result-preview when the board state moves on.
-  useEffect(() => { setLinePreview(null); }, [G.line, G.phase, G.current]);
+  // Drop any lingering result-preview / open card when the board state moves on.
+  useEffect(() => { setLinePreview(null); setCardOpen(null); }, [G.line, G.phase, G.current]);
 
   // Flash a "Your turn" cue when control lands on the viewer (esp. useful online
   // and in hotseat, where it's easy to miss the handoff).
@@ -567,6 +547,7 @@ function Board({ game }) {
     const onKey = (e) => {
       const tag = e.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (cardOpen != null) return; // the open card viewer owns the keyboard
       const canBehead = G.phase === 'playing' && !G.cpu?.[G.current] && G.current === viewerIdx;
       if (e.key === 'Escape') {
         if (G.phase === 'targeting') { game.cancelTarget(); e.preventDefault(); }
@@ -577,9 +558,10 @@ function Board({ game }) {
         game.collectAndEnd(); e.preventDefault(); return;
       }
       if ((e.key === 'u' || e.key === 'U') && game.canUndo()) { game.undo(); e.preventDefault(); return; }
-      if (/^[1-9]$/.test(e.key) && G.phase === 'playing' && G.current === viewerIdx && !G.cpu?.[G.current]) {
+      // Number keys open that hand card in the viewer (then Space plays it).
+      if (/^[1-9]$/.test(e.key) && G.phase !== 'gameOver' && G.current === viewerIdx && !G.cpu?.[G.current]) {
         const hi = Number(e.key) - 1;
-        if (hi < G.players[G.current].hand.length && game.canPlay(hi)) { game.playCard(hi); e.preventDefault(); }
+        if (hi < G.players[G.current].hand.length) { setCardOpen(hi); e.preventDefault(); }
       }
     };
     window.addEventListener('keydown', onKey);
@@ -655,7 +637,7 @@ function Board({ game }) {
 
         <GuillotineLine game={game} step={step} onPick={game.pick} onInspect={onInspect} targeting={targeting} drop={dropTick} hint={hintUids} preview={linePreview} onPreview={setLinePreview} />
 
-        <HandDock game={game} onInspect={onInspect} onPreview={setLinePreview} />
+        <HandDock game={game} onOpen={setCardOpen} />
       </main>
 
       <aside className="hud2">
@@ -711,6 +693,9 @@ function Board({ game }) {
         {splats.map(s => <BloodSplatter key={s.key} splat={s} onDone={() => setSplats(x => x.filter(y => y.key !== s.key))} />)}
         {fliers.map(f => <SliceFlier key={f.key} flier={f} onDone={() => setFliers(x => x.filter(y => y.key !== f.key))} />)}
       </div>
+      {cardOpen != null && G.current === viewerIdx && !G.cpu?.[G.current] && cardOpen < (G.players[G.current]?.hand.length ?? 0) && (
+        <CardLightbox game={game} hand={G.players[G.current].hand} index={cardOpen} setIndex={setCardOpen} onClose={() => setCardOpen(null)} />
+      )}
       {callout && <Callout callout={callout} />}
       {turnCue && <div className="turn-cue">Your turn</div>}
       <Coach show={myTurn && G.day === 1} />
@@ -729,7 +714,7 @@ function Coach({ show }) {
       <div className="coach-card" onClick={(e) => e.stopPropagation()}>
         <p className="coach-title">Your turn — here’s the loop</p>
         <ol className="coach-list">
-          <li><b>Hover</b> a hand card to preview it; <b>click</b> (or press <kbd>1</kbd>–<kbd>5</kbd>) to play it. Optional.</li>
+          <li><b>Tap a hand card</b> (or press <kbd>1</kbd>–<kbd>5</kbd>) to view it big; flip through with <kbd>‹</kbd> <kbd>›</kbd> or <kbd>←</kbd> <kbd>→</kbd>, then <b>Play this card</b> (or <kbd>Space</kbd>). Optional.</li>
           <li><b>Hover a noble</b> in the line to see what it’s worth to you.</li>
           <li><b>Behead</b> the front noble — the big button, or press <kbd>Space</kbd>.</li>
         </ol>
@@ -894,11 +879,11 @@ function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint, 
 
 // Non-interactive "here's the line afterward" strip, shown just under the line
 // while hovering a deterministic line-altering card (or a target for one).
-function LinePreviewStrip({ preview }) {
+function LinePreviewStrip({ preview, inline }) {
   if (!preview) return null;
   const display = preview.line.map((inst, idx) => ({ inst, idx })).reverse();
   return (
-    <div className="line-preview" aria-hidden="true">
+    <div className={'line-preview' + (inline ? ' inline' : '')} aria-hidden="true">
       <span className="lp-label">Result</span>
       <div className="lp-row">
         {display.map(({ inst, idx }) => {
@@ -984,7 +969,9 @@ function DeckPile({ kind, count, label }) {
 }
 
 // ─── The logged-in player's action-card hand ────────────────────────────────
-function HandDock({ game, onInspect, onPreview }) {
+// The fanned hand along the bottom. A card is a launcher: tapping it opens the
+// card viewer (CardLightbox) — it never plays straight from the fan.
+function HandDock({ game, onOpen }) {
   const { G } = game;
   const activeIsMe = game.seat == null || G.current === game.seat;
   if (G.cpu?.[G.current]) return <div className="hand-dock cpu">{G.players[G.current].name} is thinking…</div>;
@@ -992,27 +979,90 @@ function HandDock({ game, onInspect, onPreview }) {
   const hand = G.players[G.current].hand;
   const n = hand.length;
   return (
-    <div className="hand-dock">
+    <div className="hand-dock" style={{ '--n': n }}>
       {hand.map((inst, hi) => {
         const def = ACTION_BY_ID[inst.defId];
         const playable = game.canPlay(hi);
-        const blocked = playable ? null : playBlockReason(G, def);
-        // Deterministic no-target cards (Reverse, Front-to-end, named/colour-to-front)
-        // can preview their result the moment you hover them.
-        const result = playable && !getStep(def, G, []) ? previewResultLine(G, def, []) : null;
-        const ins = (el) => ({ ...actionInspect(def, el), onPlay: playable ? () => game.playCard(hi) : null,
-          affected: playable ? affectedLineUids(def, G) : null, blocked });
         return (
-          <button key={inst.uid} className={'dock-card' + (playable ? ' playable' : '')}
+          <button key={inst.uid} className={'dock-card' + (playable ? ' playable' : ' dim')}
             style={{ '--i': hi - (n - 1) / 2 }}
-            onClick={(e) => { if (COARSE) onInspect({ ...ins(e.currentTarget), pinned: true }); else if (playable) game.playCard(hi); }}
-            onMouseEnter={(e) => { onInspect(ins(e.currentTarget)); if (onPreview) onPreview(result); }}
-            onMouseLeave={() => { onInspect(null); if (onPreview) onPreview(null); }}
-            title={blocked ? `${def.name}\n${def.text}\n\nCan't play: ${blocked}` : `${def.name}\n${def.text}`}>
+            onClick={() => onOpen(hi)}
+            title={`${def.name}\n${def.text}`}>
             <img src={actionImg(def.id)} alt={def.name} loading="lazy" decoding="async" />
           </button>
         );
       })}
+    </div>
+  );
+}
+
+// Touch swipe helper (ported from Long Shot): left/right/up/down, 50px / 700ms.
+function useSwipe(onSwipe, { min = 50 } = {}) {
+  const start = useRef(null);
+  const cb = useRef(onSwipe); cb.current = onSwipe;
+  return {
+    onTouchStart: (e) => { const t = e.touches[0]; start.current = { x: t.clientX, y: t.clientY, at: Date.now() }; },
+    onTouchEnd: (e) => {
+      const s = start.current; start.current = null;
+      if (!s || Date.now() - s.at > 700) return;
+      const t = e.changedTouches[0], dx = t.clientX - s.x, dy = t.clientY - s.y;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < min) return;
+      if (Math.abs(dx) > Math.abs(dy) * 1.3) cb.current(dx < 0 ? 'left' : 'right');
+      else if (Math.abs(dy) > Math.abs(dx) * 1.3) cb.current(dy < 0 ? 'up' : 'down');
+    },
+  };
+}
+
+// Full-screen one-card-at-a-time viewer. Cycle with ‹ › arrows, ←/→ keys, or a
+// swipe; Space/Enter plays the focused card. Mirrors Long Shot's CardLightbox.
+function CardLightbox({ game, hand, index, setIndex, onClose }) {
+  const { G } = game;
+  const n = hand.length;
+  const prev = () => setIndex((index - 1 + n) % n);
+  const next = () => setIndex((index + 1) % n);
+  const swipe = useSwipe((d) => { if (d === 'left') next(); else if (d === 'right') prev(); else if (d === 'down') onClose(); });
+  useEffect(() => {
+    const key = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('input, textarea')) return;
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+      else if (e.key === ' ' || e.key === 'Enter') {
+        if (e.key === 'Enter' && e.target.closest?.('button')) return;
+        const b = document.querySelector('.lightbox .lb-bar button.lb-play:not(:disabled)');
+        if (b) { e.preventDefault(); document.activeElement?.blur?.(); b.click(); }
+      }
+    };
+    window.addEventListener('keydown', key, true);
+    return () => window.removeEventListener('keydown', key, true);
+  }); // re-register each render so the index closure stays fresh
+  const inst = hand[index];
+  if (!inst) return null;
+  const def = ACTION_BY_ID[inst.defId];
+  const playable = game.canPlay(index);
+  const blocked = playable ? null : playBlockReason(G, def);
+  const result = playable && !getStep(def, G, []) ? previewResultLine(G, def, []) : null;
+  const notYou = game.seat != null && G.current !== game.seat;
+  const play = () => { onClose(); game.playCard(index); };
+  return (
+    <div className="lightbox card-lb" onClick={onClose} {...swipe}>
+      <div className="lb-inner" onClick={(e) => e.stopPropagation()}>
+        {n > 1 && <button className="lb-arrow" onClick={prev} aria-label="Previous card">‹</button>}
+        <div className="lb-card" key={inst.uid}><img src={actionImg(def.id)} alt={def.name} /></div>
+        {n > 1 && <button className="lb-arrow" onClick={next} aria-label="Next card">›</button>}
+      </div>
+      <div className="lb-bar" onClick={(e) => e.stopPropagation()}>
+        <div className="lb-name">{def.name}</div>
+        <div className="lb-text">{def.text}</div>
+        {result && <LinePreviewStrip preview={result} inline />}
+        {playable
+          ? <button className="btn primary lb-play" onClick={play}>Play this card ▸</button>
+          : <div className="lb-info">{blocked || (notYou ? 'Waiting for your turn.' : 'You can play a card on your turn.')}</div>}
+        <div className="lb-nav">
+          <button className="btn" onClick={onClose}>Close</button>
+          <span className="lb-count">{index + 1} / {n}</span>
+        </div>
+      </div>
     </div>
   );
 }

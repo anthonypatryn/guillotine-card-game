@@ -1494,3 +1494,35 @@
 .bug-fix { color: var(--gold); font-size: 13px; }
 .linkish { background: none; border: none; color: var(--muted); text-decoration: underline; cursor: pointer; font-size: 13px; margin-top: 10px; }
 .confirm-card { width: min(90vw, 360px); }
+
+/* ===== hand card viewer (lightbox) — ported from Long Shot ===== */
+.dock-card { cursor: pointer; }
+.dock-card.dim { filter: brightness(.6) saturate(.72); }
+.dock-card.dim:hover { filter: brightness(.82) saturate(.82); }
+
+.lightbox.card-lb { flex-direction: column; gap: 16px; }
+.lb-inner { display: flex; align-items: center; gap: 14px; max-width: 100%; }
+.lb-card { width: min(300px, 80vw, calc((100vh - 230px) * 0.72)); animation: pop2 .25s cubic-bezier(.2,1.3,.4,1); }
+.lb-card img { width: 100%; height: auto; border-radius: 10px; box-shadow: 0 10px 34px rgba(0,0,0,.6); display: block; }
+.lb-arrow { color: var(--cream); font-size: 40px; line-height: 1; width: 50px; height: 50px; padding: 0 0 5px;
+  background: rgba(255,255,255,.12); border: none; border-radius: 50%; flex: none; cursor: pointer; }
+.lb-arrow:hover { background: rgba(255,255,255,.22); }
+.lb-bar { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; max-width: min(92vw, 460px); }
+.lb-name { font-family: var(--font-head); font-size: 22px; color: var(--gold); }
+.lb-text { font-size: 14px; color: var(--cream); line-height: 1.4; }
+.lb-play { font-size: 16px; padding: 8px 22px; }
+.lb-info { color: #e2a86a; background: color-mix(in srgb, #e2a86a 12%, transparent);
+  border: 1px solid color-mix(in srgb, #e2a86a 40%, transparent); border-radius: 10px; padding: 7px 14px; font-size: 13.5px; }
+.lb-nav { display: flex; align-items: center; gap: 12px; }
+.lb-count { color: var(--muted); font-size: 13px; }
+@keyframes pop2 { from { transform: scale(.85); opacity: 0; } }
+[data-reduce="1"] .lb-card { animation: none; }
+
+/* the result strip, inline inside the card viewer bar */
+.line-preview.inline { position: static; transform: none; margin: 2px 0 0; animation: none; box-shadow: none; }
+
+@media (max-width: 640px) {
+  .lb-inner { gap: 6px; }
+  .lb-arrow { width: 40px; height: 40px; font-size: 32px; }
+  .lb-card { width: min(260px, 72vw); }
+}
