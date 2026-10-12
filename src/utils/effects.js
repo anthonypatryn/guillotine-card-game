@@ -179,12 +179,19 @@ export function getStep(def, G, picks) {
 
 // Can the current player legally play this card right now?
 export function canPlayCard(G, def) {
-  if (judgeBlocks(G)) return false;            // Unpopular Judge at front
-  if (G.actionBlocked) return false;           // Rush Job
-  if (callousActive(G) && LINE_ALTERING.includes(def.family)) return false;
+  return playBlockReason(G, def) == null;
+}
+
+// Why a card can't be played right now — a short player-facing reason, or null
+// when it's playable. Mirrors canPlayCard so the two never drift.
+export function playBlockReason(G, def) {
+  if (judgeBlocks(G)) return 'An Unpopular Judge is at the front — no actions this turn.';
+  if (G.actionBlocked) return 'You were rushed — no action this turn, just collect.';
+  if (callousActive(G) && LINE_ALTERING.includes(def.family))
+    return 'Callous Guards lock the line — this card can’t move nobles now.';
   const step = getStep(def, G, []);
-  if (step && step.empty) return false;        // no legal target
-  return true;
+  if (step && step.empty) return 'No legal target for this card right now.';
+  return null;
 }
 
 // ─── apply a fully-targeted action → state patch ────────────────────────────

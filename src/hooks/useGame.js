@@ -58,6 +58,14 @@ const reseedLog = (log) => { for (const e of log || []) if (e?.id > logSeed) log
 const LOG_MAX = 60;
 const pushLog = (log, ...entries) => [...log, ...entries].slice(-LOG_MAX);
 
+// Turn prompts read naturally when the human seat is literally named "You".
+const turnLine = (name) => name === 'You'
+  ? 'Your turn — play an action (optional), then collect.'
+  : `${name}'s turn — play an action (optional), then collect.`;
+const rushLine = (name) => name === 'You'
+  ? "You're rushed — no action this turn. Collect the front noble."
+  : `${name} is rushed — no action this turn. Collect the front noble.`;
+
 export function useGame() {
   const [G, setG] = useState(fresh);
   const gRef = useRef(G); gRef.current = G;
@@ -111,8 +119,8 @@ export function useGame() {
         pending: null,
         flags: freshFlags(),
         message: blocked
-          ? `${prev.players[prev.current].name} is rushed — no action this turn. Collect the front noble.`
-          : `${prev.players[prev.current].name}'s turn — play an action (optional), then collect.`,
+          ? rushLine(prev.players[prev.current].name)
+          : turnLine(prev.players[prev.current].name),
       };
     });
   }, []);
@@ -174,7 +182,7 @@ export function useGame() {
   const cancelTarget = useCallback(() => {
     setG(prev => prev.phase !== 'targeting' ? prev :
       { ...prev, phase: 'playing', pending: null, selectedIdx: null,
-        message: `${prev.players[prev.current].name}'s turn — play an action (optional), then collect.` });
+        message: turnLine(prev.players[prev.current].name) });
   }, []);
 
   // Discard own Callous Guards (the only card discardable at will).

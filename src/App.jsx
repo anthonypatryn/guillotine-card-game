@@ -6,7 +6,7 @@ import {
   nobleImg, actionImg, NOBLE_BACK, ACTION_BACK,
 } from './data/cards';
 import { computeScore } from './utils/scoring';
-import { judgeBlocks, callousActive, lineNobleCandidates, getStep, canPlayCard } from './utils/effects';
+import { judgeBlocks, callousActive, lineNobleCandidates, getStep, canPlayCard, playBlockReason } from './utils/effects';
 import { HostRoom, JoinClient, cleanCode } from './net/room';
 import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner, DealFlier, setReduce } from './Effects';
 import { playBehead, playWhoosh, playBell, isMuted, toggleMuted } from './sound';
@@ -297,8 +297,34 @@ function affectedLineUids(def, G) {
   return new Set([...idxs].map(i => line[i]?.uid).filter(Boolean));
 }
 
-const nobleInspect = (def, el) => ({ img: nobleImg(def.id), name: def.name, faction: def.color, factionName: FACTION[def.color].title, text: def.text, color: COLOR_HEX[def.color], rect: el?.getBoundingClientRect() });
+const nobleInspect = (def, el, gain) => ({ img: nobleImg(def.id), name: def.name, faction: def.color, factionName: FACTION[def.color].title, text: def.text, color: COLOR_HEX[def.color], gain, rect: el?.getBoundingClientRect() });
 const actionInspect = (def, el) => ({ img: actionImg(def.id), name: def.name, text: def.text, color: '#b4323d', rect: el?.getBoundingClientRect() });
+
+// What a noble would be worth to `player` if collected right now — the true
+// marginal points (combos included, via computeScore) plus a plain-language note
+// about the combo that makes it swing. Powers the hover "+N pts" decision helper.
+function nobleGain(player, nobleDef) {
+  if (!player) return null;
+  const base = computeScore(player).total;
+  const after = computeScore({ ...player, scorePile: [...player.scorePile, { uid: '__preview__', defId: nobleDef.id }] }).total;
+  const delta = after - base;
+  const hold = (fn) => player.scorePile.some(i => fn(NOBLE_BY_ID[i.defId]));
+  let note = null;
+  if (nobleDef.special === 'count')
+    note = hold(n => n.special === 'countess') ? 'Completes your Count + Countess (+2 each)!' : 'Pairs with the Countess for +2 each.';
+  else if (nobleDef.special === 'countess')
+    note = hold(n => n.special === 'count') ? 'Completes your Count + Countess (+2 each)!' : 'Pairs with the Count for +2 each.';
+  else if (nobleDef.special === 'palaceGuard')
+    note = 'Palace Guards score +1 for every Guard you hold.';
+  else if (nobleDef.special === 'tragicFigure')
+    note = 'Loses a point for every common-folk head you hold.';
+  else if (nobleDef.special === 'unpopularJudge')
+    note = 'While at the front, no one can play actions.';
+  return { delta, note };
+}
+
+// Simple crown for the current points leader.
+const CrownIcon = (p) => <Ico {...p} fill="currentColor" stroke="none" d={<path d="M3 8l4 4 5-7 5 7 4-4-2 11H5z" />} />;
 
 // Faction = noble color. Each has a title and an emblem shown in the point box.
 const FACTION = {
@@ -412,7 +438,19 @@ function Board({ game }) {
   const [deals, setDeals] = useState([]);
   const [dropTick, setDropTick] = useState(0);
   const [callout, setCallout] = useState(null);
+  const [confirmNew, setConfirmNew] = useState(false);
+  const [turnCue, setTurnCue] = useState(false);
   const seen = useRef(0);
+
+  // Points leader (unique leader with >0, else none — don't crown a 0–0 tie).
+  const scores = G.players.map(p => computeScore(p).total);
+  const maxScore = Math.max(...scores);
+  const leaderIdx = (maxScore > 0 && scores.filter(s => s === maxScore).length === 1)
+    ? scores.indexOf(maxScore) : -1;
+
+  // Who is viewing (local hotseat: the active seat; online: this client's seat).
+  const viewerIdx = game.seat != null ? game.seat : G.current;
+  const myTurn = G.phase === 'playing' && !G.cpu?.[G.current] && G.current === viewerIdx;
   const lineRects = useRef({});
   const deckRects = useRef({});
   const prevDay = useRef(0);
@@ -426,6 +464,8 @@ function Board({ game }) {
     seen.current = Math.max(seen.current, ...fresh.map(l => l.id));
     const nf = [], ns = [];
     let lastPlay = null;
+    const myHeads = [];           // nobles the VIEWER collected this batch → confirmation toast
+    let lastCollectKey = 0;
     for (const e of fresh) {
       if (e.kind === 'play' && e.defId) {
         const def = ACTION_BY_ID[e.defId];
@@ -436,6 +476,10 @@ function Board({ game }) {
       if (e.kind !== 'collect') continue;
       playBehead();
       setDropTick(t => t + 1);
+      // Confirm a collect the local player made. In hotseat the turn has already
+      // advanced, so match any human seat; online, match only this client's seat.
+      const mine = game.seat != null ? e.playerIdx === game.seat : !G.cpu?.[e.playerIdx];
+      if (mine && e.defId) { myHeads.push(NOBLE_BY_ID[e.defId].name); lastCollectKey = e.id; }
       const from = lineRects.current[String(e.uid)];
       const pile = document.querySelector(`[data-pile="${e.playerIdx}"]`);
       if (!from || !pile) continue;
@@ -446,7 +490,9 @@ function Board({ game }) {
     }
     if (nf.length) setFliers(f => [...f, ...nf]);
     if (ns.length) setSplats(s => [...s, ...ns]);
+    // Plays take visual priority; otherwise confirm the viewer's own collect.
     if (lastPlay) setCallout(lastPlay);
+    else if (myHeads.length) setCallout({ key: lastCollectKey, verb: 'collected', who: 'You', name: myHeads.join(' + ') });
   });
 
   // auto-clear the callout
@@ -455,6 +501,40 @@ function Board({ game }) {
     const t = setTimeout(() => setCallout(null), 1900);
     return () => clearTimeout(t);
   }, [callout]);
+
+  // Flash a "Your turn" cue when control lands on the viewer (esp. useful online
+  // and in hotseat, where it's easy to miss the handoff).
+  useEffect(() => {
+    if (!myTurn) return;
+    setTurnCue(true);
+    const t = setTimeout(() => setTurnCue(false), 1400);
+    return () => clearTimeout(t);
+  }, [myTurn, G.current, G.day]);
+
+  // Keyboard shortcuts (desktop): Space = behead/end turn, 1–5 = play that hand
+  // card, U = undo, Esc = cancel targeting / close a pinned preview.
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const canBehead = G.phase === 'playing' && !G.cpu?.[G.current] && G.current === viewerIdx;
+      if (e.key === 'Escape') {
+        if (G.phase === 'targeting') { game.cancelTarget(); e.preventDefault(); }
+        else { closeInspect(); }
+        return;
+      }
+      if ((e.key === ' ' || e.key === 'Spacebar') && canBehead && G.phase === 'playing') {
+        game.collectAndEnd(); e.preventDefault(); return;
+      }
+      if ((e.key === 'u' || e.key === 'U') && game.canUndo()) { game.undo(); e.preventDefault(); return; }
+      if (/^[1-9]$/.test(e.key) && G.phase === 'playing' && G.current === viewerIdx && !G.cpu?.[G.current]) {
+        const hi = Number(e.key) - 1;
+        if (hi < G.players[G.current].hand.length && game.canPlay(hi)) { game.playCard(hi); e.preventDefault(); }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Capture current line-token + draw-pile positions every render (fly points).
   useLayoutEffect(() => {
@@ -532,13 +612,18 @@ function Board({ game }) {
         <div className="hud-top">
           <span className="day-chip">Day {G.day} / 3</span>
           <span className="hud-nav">
-            <button className="nav-btn" onClick={game.restart} title="New game">↻</button>
+            {confirmNew
+              ? (<span className="confirm-new">New game?
+                  <button className="nav-btn danger" onClick={() => { setConfirmNew(false); game.restart(); }} title="Confirm new game">Yes</button>
+                  <button className="nav-btn" onClick={() => setConfirmNew(false)} title="Keep playing">No</button>
+                </span>)
+              : <button className="nav-btn" onClick={() => setConfirmNew(true)} title="New game">↻</button>}
             <SoundToggle />
           </span>
         </div>
         {G.players.map((p, i) => (
           <PlayerCard key={i} player={p} index={i} game={game} step={step}
-            onInspect={onInspect} onExpand={setExpanded} />
+            onInspect={onInspect} onExpand={setExpanded} isLeader={i === leaderIdx} />
         ))}
         <LogPanel log={G.log} />
       </aside>
@@ -577,16 +662,41 @@ function Board({ game }) {
         {fliers.map(f => <SliceFlier key={f.key} flier={f} onDone={() => setFliers(x => x.filter(y => y.key !== f.key))} />)}
       </div>
       {callout && <Callout callout={callout} />}
+      {turnCue && <div className="turn-cue">Your turn</div>}
+      <Coach show={myTurn && G.day === 1} />
       <DayBanner day={G.day} />
     </div>
   );
 }
 
+// A one-time first-turn nudge covering the whole interaction loop.
+function Coach({ show }) {
+  const [done, setDone] = useState(() => { try { return localStorage.getItem('guillotine-coached') === '1'; } catch { return false; } });
+  if (done || !show) return null;
+  const dismiss = () => { try { localStorage.setItem('guillotine-coached', '1'); } catch { /* ignore */ } setDone(true); };
+  return (
+    <div className="coach" onClick={dismiss}>
+      <div className="coach-card" onClick={(e) => e.stopPropagation()}>
+        <p className="coach-title">Your turn — here’s the loop</p>
+        <ol className="coach-list">
+          <li><b>Hover</b> a hand card to preview it; <b>click</b> (or press <kbd>1</kbd>–<kbd>5</kbd>) to play it. Optional.</li>
+          <li><b>Hover a noble</b> in the line to see what it’s worth to you.</li>
+          <li><b>Behead</b> the front noble — the big button, or press <kbd>Space</kbd>.</li>
+        </ol>
+        <button className="btn primary" onClick={dismiss}>Got it</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Corner HUD player card ─────────────────────────────────────────────────
-function PlayerCard({ player, index, game, step, onInspect, onExpand }) {
+function PlayerCard({ player, index, game, step, onInspect, onExpand, isLeader }) {
   const { G } = game;
   const isCurrent = index === G.current && (G.phase === 'playing' || G.phase === 'targeting');
-  const { total } = computeScore(player);
+  const { total, lines } = computeScore(player);
+  const breakdown = lines.length
+    ? lines.map(l => `${l.label}: ${l.value > 0 ? '+' : ''}${l.value}`).join('\n') + `\n──────\nTotal: ${total}`
+    : 'No heads collected yet.';
   const playerTarget = step && step.type === 'player' && step.candidates.includes(index);
   const frontTarget = step && step.type === 'frontCard';
 
@@ -594,13 +704,16 @@ function PlayerCard({ player, index, game, step, onInspect, onExpand }) {
   player.scorePile.forEach(inst => { const c = NOBLE_BY_ID[inst.defId].color; tally[c] = (tally[c] || 0) + 1; });
 
   return (
-    <div className={'pcard' + (isCurrent ? ' active' : '') + (playerTarget ? ' selectable' : '')}
+    <div className={'pcard' + (isCurrent ? ' active' : '') + (playerTarget ? ' selectable' : '') + (isLeader ? ' leader' : '')}
       data-pile={index}
       onClick={() => (playerTarget ? game.pick({ playerIdx: index }) : onExpand(index))}>
       <div className="pc-top">
-        <span className="pc-name"><span className="pc-name-txt">{player.name}</span>{G.cpu?.[index] && <span className="cpu-badge">CPU</span>}</span>
+        <span className="pc-name">
+          {isLeader && <CrownIcon className="pc-crown" />}
+          <span className="pc-name-txt">{player.name}</span>{G.cpu?.[index] && <span className="cpu-badge">CPU</span>}
+        </span>
         <HandStack count={player.hand.length} />
-        <span className="pc-score"><ScoreDelta value={total} /><HeadScore value={total} gold /></span>
+        <span className="pc-score" title={`Score breakdown:\n${breakdown}`}><ScoreDelta value={total} /><HeadScore value={total} gold /></span>
       </div>
       <div className="pc-baskets">
         {BASKET_ORDER.map(c => <BasketPip key={c} colorKey={c} count={tally[c] || 0} title={FACTION[c].title} />)}
@@ -630,10 +743,10 @@ function PlayerCard({ player, index, game, step, onInspect, onExpand }) {
 
 function Callout({ callout }) {
   return (
-    <div className="callout" key={callout.key}>
-      <div className="co-who">{callout.who} played</div>
+    <div className={'callout' + (callout.verb === 'collected' ? ' collect' : '')} key={callout.key}>
+      <div className="co-who">{callout.who} {callout.verb || 'played'}</div>
       <div className="co-name">{callout.name}</div>
-      <div className="co-text">{callout.text}</div>
+      {callout.text && <div className="co-text">{callout.text}</div>}
     </div>
   );
 }
@@ -683,6 +796,8 @@ function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint }
   const activeIsMe = game.seat == null || G.current === game.seat;
   const canBehead = G.phase === 'playing' && !targeting && !G.cpu?.[G.current] && activeIsMe;
   const cta = G.line.length === 0 ? 'End turn' : 'Off with their head!';
+  // Whose pile the "+N pts" hover preview is measured against: the viewer's.
+  const viewer = G.players[game.seat != null ? game.seat : G.current];
   return (
     <div className="line-area">
       <div className="line-scroll" ref={scrollRef}>
@@ -697,8 +812,8 @@ function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint }
               data-line-uid={inst.uid}
               className={'noble-card token' + (idx === 0 ? ' front' : '') + (isCand && ordPos < 0 ? ' candidate' : '') + (hint?.has(inst.uid) ? ' affected' : '')}
               style={{ borderColor: COLOR_HEX[def.color] }}
-              onClick={(e) => { if (isCand && ordPos < 0) onPick({ idx }); else onInspect({ ...nobleInspect(def, e.currentTarget), pinned: true }); }}
-              onMouseEnter={(e) => onInspect(nobleInspect(def, e.currentTarget))}
+              onClick={(e) => { if (isCand && ordPos < 0) onPick({ idx }); else onInspect({ ...nobleInspect(def, e.currentTarget, nobleGain(viewer, def)), pinned: true }); }}
+              onMouseEnter={(e) => onInspect(nobleInspect(def, e.currentTarget, nobleGain(viewer, def)))}
               onMouseLeave={() => onInspect(null)}
               title={`${def.name} — ${COLORS[def.color]}`}>
               <img src={nobleImg(def.id)} alt={def.name} loading="lazy" decoding="async" />
@@ -711,13 +826,13 @@ function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint }
       <div className="guillo-col">
         <button className={'guillo-btn' + (canBehead ? ' live' : '') + (canBehead && G.line.length > 0 ? ' pulse' : '')}
           onClick={canBehead ? game.collectAndEnd : undefined} disabled={!canBehead}
-          title={canBehead ? cta : 'Wait for your turn'}>
+          title={canBehead ? `${cta} (Space)` : 'Wait for your turn'}>
           <Guillotine drop={drop} />
           <span className="guillo-cta">{cta}</span>
         </button>
         <div className="guillo-aux">
-          {targeting && <button className="btn small" onClick={game.cancelTarget}>Cancel</button>}
-          {game.canUndo() && <button className="btn small" onClick={game.undo}>↶ Undo</button>}
+          {targeting && <button className="btn small" onClick={game.cancelTarget} title="Cancel (Esc)">Cancel</button>}
+          {game.canUndo() && <button className="btn small" onClick={game.undo} title="Undo this turn's actions (U)">↶ Undo</button>}
         </div>
       </div>
     </div>
@@ -807,15 +922,16 @@ function HandDock({ game, onInspect }) {
       {hand.map((inst, hi) => {
         const def = ACTION_BY_ID[inst.defId];
         const playable = game.canPlay(hi);
+        const blocked = playable ? null : playBlockReason(G, def);
         const ins = (el) => ({ ...actionInspect(def, el), onPlay: playable ? () => game.playCard(hi) : null,
-          affected: playable ? affectedLineUids(def, G) : null });
+          affected: playable ? affectedLineUids(def, G) : null, blocked });
         return (
           <button key={inst.uid} className={'dock-card' + (playable ? ' playable' : '')}
             style={{ '--i': hi - (n - 1) / 2 }}
             onClick={(e) => { if (COARSE) onInspect({ ...ins(e.currentTarget), pinned: true }); else if (playable) game.playCard(hi); }}
             onMouseEnter={(e) => onInspect(ins(e.currentTarget))}
             onMouseLeave={() => onInspect(null)}
-            title={`${def.name}\n${def.text}`}>
+            title={blocked ? `${def.name}\n${def.text}\n\nCan't play: ${blocked}` : `${def.name}\n${def.text}`}>
             <img src={actionImg(def.id)} alt={def.name} loading="lazy" decoding="async" />
           </button>
         );
@@ -861,7 +977,8 @@ function NoblePileModal({ G, index, game, step, onInspect, forced, close }) {
 // where to look — never jumping around the hovered card.
 function HoverCard({ inspect, onKeep, onLeave, onClose }) {
   if (!inspect) return null;
-  const { img, name, faction, factionName, text, color, onPlay, pinned } = inspect;
+  const { img, name, faction, factionName, text, color, onPlay, pinned, gain, blocked } = inspect;
+  const sign = gain && gain.delta >= 0 ? '+' : '';
   return (
     <>
       {pinned && <div className="hovercard-backdrop" onClick={onClose} />}
@@ -872,7 +989,16 @@ function HoverCard({ inspect, onKeep, onLeave, onClose }) {
           {faction && <img className="hc-emblem" src={`/art/symbol-${faction}.svg`} alt={factionName} title={factionName} />}
         </div>
         <div className="hc-name">{name}</div>
+        {factionName && faction && <div className="hc-faction">{factionName}</div>}
         {text && <div className="hc-text">{text}</div>}
+        {gain && (
+          <div className={'hc-gain' + (gain.delta < 0 ? ' neg' : gain.delta > 0 ? ' pos' : '')}>
+            <span className="hc-gain-val">{sign}{gain.delta} pts</span>
+            <span className="hc-gain-sub"> if you collect it</span>
+            {gain.note && <div className="hc-gain-note">{gain.note}</div>}
+          </div>
+        )}
+        {blocked && <div className="hc-blocked">Can’t play now: {blocked}</div>}
         {onPlay && (
           <button className="btn primary hc-play" onClick={() => { onPlay(); onClose && onClose(); }}>
             Play this card ▸

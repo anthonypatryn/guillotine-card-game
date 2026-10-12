@@ -1333,3 +1333,60 @@
 .chat-input { display: flex; gap: 4px; }
 .chat-input input { flex: 1; min-width: 0; background: var(--panel-light); color: var(--ink);
   border: 1px solid var(--panel-light); border-radius: 8px; padding: 6px 8px; font-size: 13px; }
+
+/* ===== UX pass: decision helpers, leader, toasts, coach ===== */
+
+/* hover preview — faction line + "what's it worth to me" + why-not-playable */
+.hc-faction { font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--muted); text-align: center; margin-top: -2px; }
+.hc-gain { margin-top: 8px; text-align: center; background: color-mix(in srgb, var(--gold) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); border-radius: 10px; padding: 6px 10px; }
+.hc-gain-val { font-family: var(--font-head); font-size: 20px; color: var(--gold); }
+.hc-gain.pos .hc-gain-val { color: #7bd88f; }
+.hc-gain.neg .hc-gain-val { color: #e2726a; }
+.hc-gain-sub { font-size: 12.5px; color: var(--muted); }
+.hc-gain-note { font-size: 12.5px; color: var(--ink); margin-top: 3px; line-height: 1.35; }
+.hc-blocked { margin-top: 8px; text-align: center; font-size: 12.5px; line-height: 1.35;
+  color: #e2a86a; background: color-mix(in srgb, #e2a86a 12%, transparent);
+  border: 1px solid color-mix(in srgb, #e2a86a 40%, transparent); border-radius: 10px; padding: 6px 10px; }
+
+/* points leader crown */
+.pc-crown { width: 15px; height: 15px; color: var(--gold); flex: 0 0 auto; margin-right: 3px;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.5)); }
+.pcard.leader { border-color: color-mix(in srgb, var(--gold) 75%, transparent); }
+.pcard.leader.active { border-color: #ffdf8a; }
+
+/* inline "new game?" confirm in the HUD */
+.confirm-new { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink); }
+.nav-btn.danger { color: #fff; background: var(--accent); border-color: var(--accent-bright); }
+
+/* collect confirmation reuses the callout, tinted toward the pile */
+.callout.collect { top: 20%; }
+.callout.collect .co-name { font-size: 22px; }
+
+/* "Your turn" cue */
+.turn-cue {
+  position: fixed; left: 50%; top: 30%; transform: translateX(-50%);
+  z-index: 58; pointer-events: none; font-family: var(--font-head); font-size: 30px;
+  color: var(--gold); text-shadow: 0 2px 10px rgba(0,0,0,.7); letter-spacing: 1px;
+  animation: turnCueIn 1.4s ease forwards;
+}
+@keyframes turnCueIn {
+  0% { opacity: 0; transform: translateX(-50%) scale(.85); }
+  12% { opacity: 1; transform: translateX(-50%) scale(1.05); }
+  22% { transform: translateX(-50%) scale(1); }
+  78% { opacity: 1; } 100% { opacity: 0; }
+}
+[data-reduce="1"] .turn-cue { animation: none; }
+
+/* first-turn coach */
+.coach { position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center; }
+.coach-card { background: var(--panel); border: 1px solid var(--gold); border-radius: 14px;
+  padding: 18px 20px; max-width: min(92vw, 420px); box-shadow: 0 16px 40px rgba(0,0,0,.6); }
+.coach-title { font-family: var(--font-head); font-size: 20px; color: var(--gold); margin: 0 0 8px; }
+.coach-list { margin: 0 0 14px 18px; font-size: 14px; line-height: 1.5; }
+.coach-list li { margin: 5px 0; }
+.coach-list kbd { font-family: var(--font-body); font-size: 11.5px; background: var(--panel-light);
+  border: 1px solid var(--muted); border-radius: 5px; padding: 0 5px; }
+.coach-card .btn { width: 100%; }
