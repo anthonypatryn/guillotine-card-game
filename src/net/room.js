@@ -63,6 +63,8 @@ function sendMsg(conn, msg) {
   for (let i = 0; i < n; i++) conn.send({ t: 'part', id, i, n, s: str.slice(i * PART_CHARS, (i + 1) * PART_CHARS) });
 }
 
+const cleanChat = (t) => String(t || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+
 class Emitter {
   constructor() { this.subs = new Set(); }
   on(fn) { this.subs.add(fn); return () => this.subs.delete(fn); }
@@ -95,6 +97,7 @@ export class HostRoom extends Emitter {
     this.started = !!resume;
     this.game = null;            // the live useGame object, kept fresh by the host component
     this.conns = new Map();      // clientId → conn
+    this.chat = [];              // { name, text, at }
     this.wantCode = resume?.code ?? null;  // after a reload: keep trying for the same code
     this.codeTries = 0;
     this.open(this.wantCode ?? randomCode());
@@ -164,6 +167,7 @@ export class HostRoom extends Emitter {
       this.emit();
       return;
     }
+    if (m.t === 'chat') { const seat = this.seatOf(conn); if (seat >= 0) this.say(this.seats[seat].name, m.text); return; }
     if (m.t === 'action' && this.started && this.game) {
       const seat = this.seatOf(conn);
       if (seat < 0) return;
@@ -172,6 +176,15 @@ export class HostRoom extends Emitter {
       try { this.game[m.fn]?.(...(Array.isArray(m.args) ? m.args : [])); } catch { /* ignore bad action */ }
     }
   }
+
+  // chat: anyone in the room; the host echoes it to every friend
+  say(name, text) {
+    text = cleanChat(text); if (!text) return;
+    this.chat = [...this.chat.slice(-39), { name, text, at: Date.now() }];
+    for (const c of this.conns.values()) { try { if (c.open) c.send({ t: 'chat', name, text }); } catch { /* closed */ } }
+    this.emit();
+  }
+  sayAs(text) { const h = this.seats.find((s) => s.kind === 'host'); this.say(h?.name || 'Host', text); }
 
   onClose(conn) {
     const seat = this.seatOf(conn);
@@ -247,6 +260,7 @@ export class JoinClient extends Emitter {
     this.lobby = null;
     this.G = null;
     this.you = null;
+    this.chat = [];
     this.retries = 0;
     this.peer = new Peer(peerOptions());
     this.peer.on('open', () => this.connect());
@@ -290,12 +304,14 @@ export class JoinClient extends Emitter {
     if (m.t === 'ping') { try { this.conn?.send({ t: 'pong' }); } catch { /* closed */ } return; }
     if (m.t === 'lobby') { this.lobby = m; this.you = m.you; if (!m.started) { this.G = null; this.status = 'lobby'; } else if (this.G) this.status = 'game'; }
     else if (m.t === 'state') { this.G = m.G; this.you = m.you; this.status = 'game'; }
+    else if (m.t === 'chat') { this.chat = [...this.chat.slice(-39), { name: m.name, text: cleanChat(m.text), at: Date.now() }]; }
     else if (m.t === 'ended') { this.status = 'ended'; this.error = m.reason || 'The room closed.'; this.peer.destroy(); }
     this.emit();
   }
 
   // send an engine action for my seat
   action(fn, args) { try { this.conn?.send({ t: 'action', fn, args }); } catch { /* reconnecting */ } }
+  say(text) { text = cleanChat(text); if (text) { try { this.conn?.send({ t: 'chat', text }); } catch { /* reconnecting */ } } }
   fail(msg) { this.status = 'error'; this.error = msg; this.emit(); }
   rejoin() { if (this.peer.destroyed) return; clearTimeout(this.retryT); this.retries = 0; this.status = 'reconnecting'; this.error = ''; this.emit(); if (this.peer.disconnected) this.peer.reconnect(); else this.connect(); }
   close() { clearTimeout(this.retryT); clearInterval(this.beat); this.status = 'ended'; this.peer?.destroy(); }

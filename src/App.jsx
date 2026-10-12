@@ -84,6 +84,10 @@ export default function App() {
   const [theme, setThemeState] = useState(loadTheme);
   const [showTheme, setShowTheme] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  // first-time tutorial: open "How to play" on the very first visit
+  useEffect(() => {
+    try { if (!localStorage.getItem('guillotine-seen-help')) { setShowHelp(true); localStorage.setItem('guillotine-seen-help', '1'); } } catch { /* ignore */ }
+  }, []);
   const [speed, setSpeed] = useState(() => { try { return Number(localStorage.getItem('guillotine-speed')) || 1; } catch { return 1; } });
   const [reduce, setReduceState] = useState(() => {
     try { const v = localStorage.getItem('guillotine-reduce'); return v == null ? false : v === '1'; } catch { return false; }
@@ -159,6 +163,7 @@ export default function App() {
   if (view === 'bugs') return <div className="app"><BugViewer /></div>;
   if (view === 'art') return <div className="app"><ArtReview /></div>;
   if (view === 'cardedit') return <div className="app"><CardEdit /></div>;
+  if (view === 'stats') return <div className="app"><StatsView /></div>;
 
   return (
     <div className="app">
@@ -289,12 +294,22 @@ function StartScreen({ onStart, onOnline, onResume }) {
         {onOnline && <button className="btn start-btn online-btn" onClick={onOnline}>Play Online →</button>}
       </div>
       <p className="muted small resist-note">CPU players are code-named Résistants — set each one's nerve from Recrue to Maquisard. Or play online with friends.</p>
+      <a className="hof-link" href="?view=stats">Hall of Fame →</a>
     </div>
   );
 }
 
-function GameOver({ G, onRestart }) {
+function GameOver({ G, onRestart, record = true }) {
   useEffect(() => { playBell(0.7); }, []);
+  useEffect(() => {
+    if (!record) return;
+    try {
+      const rows = G.players.map((p) => ({ name: p.name, total: computeScore(p).total })).sort((a, b) => b.total - a.total);
+      const w = rows[0];
+      fetch('/api/tally', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'record', winner: w.name, score: w.total, players: G.players.length }) }).catch(() => {});
+    } catch { /* ignore */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const awards = accolades(G.players);
   const rows = G.players.map((p, i) => ({ name: p.name, total: computeScore(p).total, idx: i }))
     .sort((a, b) => b.total - a.total);
@@ -940,6 +955,35 @@ function useLive(obj) {
   useEffect(() => (obj ? obj.on(bump) : undefined), [obj]);
 }
 
+// Online chat + quick taunts, a collapsible corner panel.
+function ChatPanel({ messages, onSend }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState('');
+  const send = () => { const t = text.trim(); if (t) { onSend(t); setText(''); } };
+  const recent = (messages || []).slice(-30);
+  return (
+    <div className={'chat-panel' + (open ? ' open' : '')}>
+      <button className="chat-toggle" onClick={() => setOpen((o) => !o)}>Chat{recent.length ? ` · ${recent.length}` : ''}</button>
+      {open && (
+        <div className="chat-box">
+          <div className="chat-log">
+            {recent.length ? recent.map((m, i) => <div key={i} className="chat-msg"><b>{m.name}</b> {m.text}</div>)
+              : <div className="muted small">Say hello…</div>}
+          </div>
+          <div className="chat-taunts">
+            {['Nice!', 'Off with your head!', 'Mercy!', 'Ha!'].map((t) => <button key={t} onClick={() => onSend(t)}>{t}</button>)}
+          </div>
+          <div className="chat-input">
+            <input value={text} maxLength={120} placeholder="Message…"
+              onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()} />
+            <button className="btn small" onClick={send}>Send</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OnlineHome({ onHost, onJoin, onBack }) {
   const joinCode = cleanCode(new URLSearchParams(location.search).get('join') || '');
   const [tab, setTab] = useState(joinCode ? 'join' : 'host');
@@ -1036,7 +1080,7 @@ function HostShell({ room, speed, onExit, resumeG }) {
   if (!room.started || G.phase === 'start')
     return <Lobby room={room} isHost code={room.code} seats={room.seats} onStart={start} onExit={exit} />;
   if (G.phase === 'gameOver') return <GameOver G={G} onRestart={exit} />;
-  return <Board game={{ ...game, seat: 0 }} />;
+  return (<><Board game={{ ...game, seat: 0 }} /><ChatPanel messages={room.chat} onSend={(t) => room.sayAs(t)} /></>);
 }
 
 function ClientShell({ client, onExit }) {
@@ -1064,8 +1108,8 @@ function ClientShell({ client, onExit }) {
     discardFront: (uid) => client.action('discardFront', [uid]),
     advanceFromPass: () => {}, cpuPlay: () => {}, score: (p) => computeScore(p),
   };
-  if (G.phase === 'gameOver') return <GameOver G={G} onRestart={onExit} />;
-  return <Board game={facade} />;
+  if (G.phase === 'gameOver') return <GameOver G={G} onRestart={onExit} record={false} />;
+  return (<><Board game={facade} /><ChatPanel messages={client.chat} onSend={(t) => client.say(t)} /></>);
 }
 
 const TRACKS = [
@@ -1270,6 +1314,44 @@ function CardEdit() {
         <button className="btn" onClick={() => setPos(NUMPOS_DEFAULTS)}>Reset</button>
       </div>
       <p className="muted small" style={{ marginTop: 10 }}>Paste the copied line back to me and I&rsquo;ll apply it exactly.</p>
+    </div>
+  );
+}
+
+// ─── Hall of Fame (/?view=stats) ─────────────────────────────────────────────
+function StatsView() {
+  const [data, setData] = useState(null);
+  useEffect(() => { fetch('/api/tally').then((r) => r.json()).then(setData).catch(() => setData({ games: 0, wins: [], recent: [] })); }, []);
+  return (
+    <div className="art-review stats-view">
+      <header className="ar-head">
+        <img className="ar-logo" src="/logo-title.png" alt="Guillotine" />
+        <h1>Hall of Fame</h1>
+        <p className="muted">{data ? `${data.games} game${data.games === 1 ? '' : 's'} played` : 'Loading…'}</p>
+      </header>
+      {data && (
+        <>
+          <section>
+            <h2>Most wins</h2>
+            <div className="hof-list">
+              {(data.wins || []).length ? data.wins.map((w, i) => (
+                <div key={w.name + i} className="hof-row"><span className="hof-rank">{i + 1}</span>
+                  <span className="hof-name">{w.name}</span><span className="hof-n">{w.n} win{w.n === 1 ? '' : 's'}</span></div>
+              )) : <p className="muted">No champions yet — go win one.</p>}
+            </div>
+          </section>
+          <section>
+            <h2>Recent champions</h2>
+            <div className="hof-list">
+              {(data.recent || []).length ? data.recent.map((r, i) => (
+                <div key={i} className="hof-row"><span className="hof-name">{r.winner}</span>
+                  <span className="hof-n">{r.score} pts · {r.players}p</span></div>
+              )) : <p className="muted">—</p>}
+            </div>
+          </section>
+        </>
+      )}
+      <p className="ar-foot muted">Vive la Révolution !</p>
     </div>
   );
 }
