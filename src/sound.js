@@ -46,6 +46,9 @@ export function playBehead() {
   setTimeout(() => play(GORE, 0.85), 110);
 }
 
+// Just the blade swish (no gore) — used for the logo gleam on load.
+export function playSlice(volume = 0.5) { play(SLICE, volume); }
+
 // A synthesized card "whoosh" (filtered noise sweep) when a card is played.
 let _ac;
 function actx() {

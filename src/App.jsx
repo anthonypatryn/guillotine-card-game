@@ -6,16 +6,28 @@ import {
   nobleImg, actionImg, NOBLE_BACK, ACTION_BACK,
 } from './data/cards';
 import { computeScore } from './utils/scoring';
-import { judgeBlocks, callousActive, lineNobleCandidates, getStep, canPlayCard, playBlockReason } from './utils/effects';
+import { judgeBlocks, callousActive, lineNobleCandidates, getStep, canPlayCard, playBlockReason, applyResolved } from './utils/effects';
 import { HostRoom, JoinClient, cleanCode } from './net/room';
 import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner, DealFlier, setReduce } from './Effects';
-import { playBehead, playWhoosh, playBell, isMuted, toggleMuted } from './sound';
+import { playBehead, playWhoosh, playBell, playSlice, isMuted, toggleMuted } from './sound';
 import { loadTheme, applyTheme, THEME_KEY, ThemeSheet } from './theme';
 
+
+// The brand logo with a one-time light sweep (reflection) across its shape.
+function ShineLogo({ className }) {
+  return (
+    <span className={'shine-logo ' + (className || '')}>
+      <img className={className} src="/logo-title.png" alt="Guillotine" />
+      <span className="shine-gleam" style={{ WebkitMaskImage: 'url(/logo-title.png)', maskImage: 'url(/logo-title.png)' }} aria-hidden="true" />
+    </span>
+  );
+}
 
 export default function App() {
   const game = useGame();
   const { G } = game;
+  // On first load, swish the guillotine blade as the logo gleam sweeps across.
+  useEffect(() => { playSlice(0.45); }, []);
   const [theme, setThemeState] = useState(loadTheme);
   const [showTheme, setShowTheme] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -103,7 +115,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <img className="topbar-logo" src="/logo-title.png" alt="Guillotine" />
+        <ShineLogo className="topbar-logo" />
         <span className="tagline">win by getting a head</span>
         <button className="nav-btn" onClick={() => setShowHelp(true)} title="How to play">?</button>
         <button className="nav-btn" onClick={toggleSpeed} title="CPU speed">{speed}×</button>
@@ -197,7 +209,7 @@ function StartScreen({ onStart, onOnline, onResume }) {
   return (
     <div className="screen center start-screen">
       <div className="start-fleurs" aria-hidden="true" />
-      <img className="start-logo" src="/logo-title.png" alt="Guillotine" />
+      <ShineLogo className="start-logo" />
       <p className="muted">The revolutionary card game where you win by getting a head.</p>
       {onResume && <button className="btn primary start-btn resume-btn" onClick={onResume}>↻ Resume saved game</button>}
       <div className="count-pick">
@@ -295,6 +307,32 @@ function affectedLineUids(def, G) {
   }
   if (!idxs.size) return null;
   return new Set([...idxs].map(i => line[i]?.uid).filter(Boolean));
+}
+
+// The resulting line if `def` were applied with `picks` — but ONLY for cards
+// whose outcome is deterministic (no shuffle/random draw), so the preview never
+// lies. Returns { line, movedUid } or null. Powers the "Result" strip.
+function previewResultLine(G, def, picks = []) {
+  if (!def || !G.line.length) return null;
+  const { family, params } = def;
+  const deterministic =
+    family === 'lineMove' ||
+    family === 'toFrontEnd' ||
+    (family === 'rearrange' && params?.kind === 'reverse') ||
+    (family === 'lineAddRemove' && params?.kind === 'removeNoble');
+  if (!deterministic) return null;
+  let patch;
+  try { patch = applyResolved(G, def, picks, {}); } catch { return null; }
+  if (!patch || !patch.line) return null;
+  const idx = picks[0]?.idx;
+  let movedUid = null;
+  if (family === 'lineMove' && idx != null) movedUid = G.line[idx]?.uid;
+  else if (family === 'toFrontEnd') {
+    if (params.op === 'frontToEnd') movedUid = G.line[0]?.uid;
+    else if ((params.op === 'anyToFront' || params.op === 'specialToFront') && idx != null) movedUid = G.line[idx]?.uid;
+    else if (params.op === 'namedToFront' || params.op === 'nearestColorToFront') movedUid = patch.line[0]?.uid;
+  }
+  return { line: patch.line, movedUid };
 }
 
 const nobleInspect = (def, el, gain) => ({ img: nobleImg(def.id), name: def.name, faction: def.color, factionName: FACTION[def.color].title, text: def.text, color: COLOR_HEX[def.color], gain, rect: el?.getBoundingClientRect() });
@@ -440,6 +478,7 @@ function Board({ game }) {
   const [callout, setCallout] = useState(null);
   const [confirmNew, setConfirmNew] = useState(false);
   const [turnCue, setTurnCue] = useState(false);
+  const [linePreview, setLinePreview] = useState(null);
   const seen = useRef(0);
 
   // Points leader (unique leader with >0, else none — don't crown a 0–0 tie).
@@ -501,6 +540,9 @@ function Board({ game }) {
     const t = setTimeout(() => setCallout(null), 1900);
     return () => clearTimeout(t);
   }, [callout]);
+
+  // Drop any lingering result-preview when the board state moves on.
+  useEffect(() => { setLinePreview(null); }, [G.line, G.phase, G.current]);
 
   // Flash a "Your turn" cue when control lands on the viewer (esp. useful online
   // and in hotseat, where it's easy to miss the handoff).
@@ -603,9 +645,9 @@ function Board({ game }) {
         </div>
         {locks.length > 0 && <div className="locks">{locks.map((l, i) => <span key={i} className="lock-chip">{l}</span>)}</div>}
 
-        <GuillotineLine game={game} step={step} onPick={game.pick} onInspect={onInspect} targeting={targeting} drop={dropTick} hint={hintUids} />
+        <GuillotineLine game={game} step={step} onPick={game.pick} onInspect={onInspect} targeting={targeting} drop={dropTick} hint={hintUids} preview={linePreview} onPreview={setLinePreview} />
 
-        <HandDock game={game} onInspect={onInspect} />
+        <HandDock game={game} onInspect={onInspect} onPreview={setLinePreview} />
       </main>
 
       <aside className="hud2">
@@ -763,8 +805,9 @@ function TurnSteps({ G }) {
 }
 
 // ─── The line of nobles + the (top-down) guillotine ─────────────────────────
-function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint }) {
+function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint, preview, onPreview }) {
   const { G } = game;
+  const pendingDef = G.pending ? ACTION_BY_ID[G.pending.defId] : null;
   const scrollRef = useRef(null);
   const cardEls = useRef(new Map());
   const prevOffsets = useRef(new Map());
@@ -813,8 +856,9 @@ function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint }
               className={'noble-card token' + (idx === 0 ? ' front' : '') + (isCand && ordPos < 0 ? ' candidate' : '') + (hint?.has(inst.uid) ? ' affected' : '')}
               style={{ borderColor: COLOR_HEX[def.color] }}
               onClick={(e) => { if (isCand && ordPos < 0) onPick({ idx }); else onInspect({ ...nobleInspect(def, e.currentTarget, nobleGain(viewer, def)), pinned: true }); }}
-              onMouseEnter={(e) => onInspect(nobleInspect(def, e.currentTarget, nobleGain(viewer, def)))}
-              onMouseLeave={() => onInspect(null)}
+              onMouseEnter={(e) => { onInspect(nobleInspect(def, e.currentTarget, nobleGain(viewer, def)));
+                if (onPreview && isCand && ordPos < 0 && step?.type === 'lineNoble' && pendingDef) onPreview(previewResultLine(G, pendingDef, [{ idx }])); }}
+              onMouseLeave={() => { onInspect(null); if (onPreview) onPreview(null); }}
               title={`${def.name} — ${COLORS[def.color]}`}>
               <img src={nobleImg(def.id)} alt={def.name} loading="lazy" decoding="async" />
               {idx === 0 && ordPos < 0 && <span className="front-tag">NEXT</span>}
@@ -834,6 +878,28 @@ function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint }
           {targeting && <button className="btn small" onClick={game.cancelTarget} title="Cancel (Esc)">Cancel</button>}
           {game.canUndo() && <button className="btn small" onClick={game.undo} title="Undo this turn's actions (U)">↶ Undo</button>}
         </div>
+      </div>
+      <LinePreviewStrip preview={preview} />
+    </div>
+  );
+}
+
+// Non-interactive "here's the line afterward" strip, shown just under the line
+// while hovering a deterministic line-altering card (or a target for one).
+function LinePreviewStrip({ preview }) {
+  if (!preview) return null;
+  const display = preview.line.map((inst, idx) => ({ inst, idx })).reverse();
+  return (
+    <div className="line-preview" aria-hidden="true">
+      <span className="lp-label">Result</span>
+      <div className="lp-row">
+        {display.map(({ inst, idx }) => {
+          const def = NOBLE_BY_ID[inst.defId];
+          return <img key={inst.uid}
+            className={'lp-card' + (idx === 0 ? ' front' : '') + (inst.uid === preview.movedUid ? ' moved' : '')}
+            src={nobleImg(def.id)} alt="" style={{ borderColor: COLOR_HEX[def.color] }} />;
+        })}
+        <span className="lp-guillo" title="guillotine (front)">▸</span>
       </div>
     </div>
   );
@@ -910,7 +976,7 @@ function DeckPile({ kind, count, label }) {
 }
 
 // ─── The logged-in player's action-card hand ────────────────────────────────
-function HandDock({ game, onInspect }) {
+function HandDock({ game, onInspect, onPreview }) {
   const { G } = game;
   const activeIsMe = game.seat == null || G.current === game.seat;
   if (G.cpu?.[G.current]) return <div className="hand-dock cpu">{G.players[G.current].name} is thinking…</div>;
@@ -923,14 +989,17 @@ function HandDock({ game, onInspect }) {
         const def = ACTION_BY_ID[inst.defId];
         const playable = game.canPlay(hi);
         const blocked = playable ? null : playBlockReason(G, def);
+        // Deterministic no-target cards (Reverse, Front-to-end, named/colour-to-front)
+        // can preview their result the moment you hover them.
+        const result = playable && !getStep(def, G, []) ? previewResultLine(G, def, []) : null;
         const ins = (el) => ({ ...actionInspect(def, el), onPlay: playable ? () => game.playCard(hi) : null,
           affected: playable ? affectedLineUids(def, G) : null, blocked });
         return (
           <button key={inst.uid} className={'dock-card' + (playable ? ' playable' : '')}
             style={{ '--i': hi - (n - 1) / 2 }}
             onClick={(e) => { if (COARSE) onInspect({ ...ins(e.currentTarget), pinned: true }); else if (playable) game.playCard(hi); }}
-            onMouseEnter={(e) => onInspect(ins(e.currentTarget))}
-            onMouseLeave={() => onInspect(null)}
+            onMouseEnter={(e) => { onInspect(ins(e.currentTarget)); if (onPreview) onPreview(result); }}
+            onMouseLeave={() => { onInspect(null); if (onPreview) onPreview(null); }}
             title={blocked ? `${def.name}\n${def.text}\n\nCan't play: ${blocked}` : `${def.name}\n${def.text}`}>
             <img src={actionImg(def.id)} alt={def.name} loading="lazy" decoding="async" />
           </button>
@@ -1055,7 +1124,7 @@ function OnlineHome({ onHost, onJoin, onBack }) {
   const join = () => { const c = cleanCode(code); if (c.length === 5) onJoin(new JoinClient(c, name.trim() || 'Friend')); };
   return (
     <div className="screen center online-home">
-      <img className="start-logo" src="/logo-title.png" alt="Guillotine" />
+      <ShineLogo className="start-logo" />
       <div className="oh-tabs">
         <button className={'mode-btn' + (tab === 'host' ? ' on' : '')} onClick={() => setTab('host')}>Host a game</button>
         <button className={'mode-btn' + (tab === 'join' ? ' on' : '')} onClick={() => setTab('join')}>Join with a code</button>
