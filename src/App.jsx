@@ -223,6 +223,7 @@ function StartScreen({ onStart, onOnline, onResume }) {
       <div className="start-fleurs" aria-hidden="true" />
       <ShineLogo className="start-logo" />
       <p className="muted">The revolutionary card game where you win by getting a head.</p>
+      <div className="fleur-divider" aria-hidden="true"><i /></div>
       {onResume && <button className="btn primary start-btn resume-btn" onClick={onResume}>↻ Resume saved game</button>}
       <div className="count-pick">
         <span className="cp-label">Players</span>
@@ -1397,10 +1398,34 @@ function ClientShell({ client, onExit }) {
   return (<><Board game={facade} /><ChatPanel messages={client.chat} onSend={(t) => client.say(t)} /></>);
 }
 
-const TRACKS = [
+const TRACK_LIST = [
+  { src: '/music/marseillaise.mp3', name: 'La Marseillaise (8-bit)' },
   { src: '/music/one-day-more-8bit.mp3', name: 'One Day More (8-bit)' },
   { src: '/music/do-you-hear-8bit.mp3', name: 'Do You Hear the People Sing (8-bit)' },
+  { src: '/music/clair-de-lune.mp3', name: 'Clair de Lune — Debussy (8-bit)' },
+  { src: '/music/moonlight-3rd.mp3', name: 'Moonlight Sonata III — Beethoven (8-bit)' },
+  { src: '/music/rondo-alla-turca.mp3', name: 'Rondo Alla Turca — Mozart (8-bit)' },
+  { src: '/music/chopin-ballades.mp3', name: '4 Ballades — Chopin (8-bit)' },
+  { src: '/music/jimmy-cueball.mp3', name: "Jimmy White's Cueball (GBC)" },
+  { src: '/music/std-rainbow.mp3', name: 'Over the Rainbow (SNES Jazz)' },
+  { src: '/music/std-infant-eyes.mp3', name: 'Infant Eyes (SNES Jazz)' },
+  { src: '/music/std-ipanema.mp3', name: 'Girl From Ipanema (SNES Jazz)' },
+  { src: '/music/std-miss-jones.mp3', name: 'Have You Met Miss Jones? (SNES Jazz)' },
+  { src: '/music/std-one-only-love.mp3', name: 'My One And Only Love (SNES Jazz)' },
+  { src: '/music/std-poinciana.mp3', name: 'Poinciana (SNES Jazz)' },
+  { src: '/music/std-favorite-things.mp3', name: 'My Favorite Things (SNES Jazz)' },
+  { src: '/music/std-never-in-love.mp3', name: 'Never Been in Love Before (SNES Jazz)' },
+  { src: '/music/std-green-dolphin.mp3', name: 'On Green Dolphin Street (SNES Jazz)' },
+  { src: '/music/std-humpty.mp3', name: 'Humpty Dumpty (SNES Jazz)' },
+  { src: '/music/std-rainbow-connection.mp3', name: 'Rainbow Connection (SNES Jazz)' },
+  { src: '/music/std-just-the-way.mp3', name: 'Just the Way You Are (SNES Jazz)' },
 ];
+// Shuffle once per load so the rotation varies between sessions.
+const TRACKS = (() => {
+  const a = [...TRACK_LIST];
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+})();
 
 function MusicPlayer() {
   const audioRef = useRef(null);

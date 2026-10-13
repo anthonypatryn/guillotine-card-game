@@ -1850,3 +1850,132 @@ button { -webkit-appearance: none; appearance: none; }
 .start-screen .muted, .tagline { font-family: var(--font-flavor) !important; font-style: normal !important; }
 .start-screen .muted { font-size: 13px !important; line-height: 1.5; letter-spacing: .3px; }
 .start-screen .resist-note { font-size: 12px !important; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   PIXEL PASS 3 — fleur-de-lis accents, dimensional tabs/buttons,
+   pixel music player
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ---- fleur-de-lis: faint tiled backdrop on the menu ---- */
+.start-fleurs::before {
+  background: url('/fleur-gold.svg') 0 0 / 84px 84px repeat !important;
+  opacity: .055 !important;
+  image-rendering: pixelated;
+}
+/* a visible gold fleur divider */
+.fleur-divider {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  width: min(90vw, 460px); margin: 4px auto 2px; opacity: .95;
+}
+.fleur-divider::before, .fleur-divider::after {
+  content: ''; height: 3px; flex: 1;
+  background: linear-gradient(90deg, transparent, #8a6a2e, transparent);
+}
+.fleur-divider i {
+  width: 26px; height: 28px; flex: 0 0 auto;
+  background: url('/fleur-gold.svg') center/contain no-repeat;
+  image-rendering: pixelated;
+}
+/* GameOver winner marker → gold fleur */
+.go-crown {
+  display: inline-block; width: 22px; height: 24px; color: transparent;
+  background: url('/fleur-gold.svg') center/contain no-repeat; image-rendering: pixelated;
+}
+.pc-crown, .crown-ico { filter: none; }
+
+/* ═══ dimensional ACTION / COLLECT / DRAW tabs ═══ */
+.tstep {
+  border-radius: 0 !important;
+  font-family: var(--font-display) !important; font-size: 9px !important;
+  letter-spacing: 1px; text-transform: uppercase;
+  padding: 7px 12px !important;
+  color: var(--px-dim) !important;
+  border: 3px solid #000 !important;
+  background:
+    radial-gradient(120% 120% at 15% 10%, rgba(255,255,255,.12), transparent 45%),
+    radial-gradient(120% 120% at 85% 90%, rgba(0,0,0,.4), transparent 50%),
+    linear-gradient(180deg, #37304a, #221b2e) !important;
+  box-shadow: 0 4px 0 #000, inset 0 2px 0 rgba(255,255,255,.1) !important;
+  text-shadow: 1px 1px 0 #000;
+}
+.tstep.on {
+  color: #2a1d14 !important;
+  background:
+    radial-gradient(120% 120% at 15% 10%, rgba(255,255,255,.6), transparent 45%),
+    radial-gradient(120% 120% at 85% 90%, rgba(120,80,10,.5), transparent 50%),
+    linear-gradient(180deg, #f6dd8a, #e8c35a 50%, #b4882e) !important;
+  box-shadow: 0 4px 0 #6e4a12, inset 0 2px 0 rgba(255,255,255,.5) !important;
+  text-shadow: none;
+}
+.tstep.done { color: #8fa06e !important; opacity: 1; }
+
+/* ═══ dimensional "Off with their head!" button ═══ */
+.plaza-controls .guillo-btn {
+  border-radius: 0 !important;
+  font-family: var(--font-display) !important; font-size: 11px !important;
+  padding: 12px 20px !important;
+  border: 3px solid #000 !important;
+  color: var(--px-ink) !important;
+  background:
+    radial-gradient(130% 130% at 12% 8%, rgba(255,255,255,.14), transparent 42%),
+    radial-gradient(130% 130% at 88% 92%, rgba(0,0,0,.45), transparent 48%),
+    linear-gradient(180deg, #37304a, #1d1728) !important;
+  box-shadow: 0 6px 0 #000, inset 0 3px 0 rgba(255,255,255,.14) !important;
+  text-shadow: 2px 2px 0 #000;
+}
+.plaza-controls .guillo-btn.live {
+  color: #2a0d10 !important;
+  background:
+    radial-gradient(130% 130% at 12% 8%, rgba(255,255,255,.55), transparent 42%),
+    radial-gradient(130% 130% at 88% 92%, rgba(90,10,14,.55), transparent 48%),
+    linear-gradient(180deg, #f6dd8a, #e8c35a 48%, #b4882e) !important;
+  border-color: #000 !important;
+  box-shadow: 0 6px 0 #6e4a12, inset 0 3px 0 rgba(255,255,255,.6) !important;
+  text-shadow: 1px 1px 0 rgba(255,255,255,.35);
+}
+.plaza-controls .guillo-btn.live:hover { filter: brightness(1.08); }
+.plaza-controls .guillo-btn.live:active { transform: translateY(5px); box-shadow: 0 1px 0 #6e4a12, inset 0 3px 0 rgba(255,255,255,.5) !important; }
+.plaza-controls .guillo-btn:disabled { opacity: 1; }
+
+/* ═══ PIXEL MUSIC PLAYER ═══ */
+.music-player {
+  background: linear-gradient(180deg, #241d30, #16111f) !important;
+  border: 3px solid #000 !important; border-radius: 0 !important;
+  box-shadow: 0 3px 0 #000, inset 0 2px 0 rgba(255,255,255,.08) !important;
+  padding: 5px 8px !important; gap: 7px !important;
+  image-rendering: pixelated;
+}
+.mp-btn {
+  width: 24px !important; height: 22px !important; padding: 0 !important;
+  background: linear-gradient(180deg, #43395c, #241d30) !important;
+  border: 2px solid #000 !important; border-radius: 0 !important;
+  color: var(--px-ink) !important;
+  box-shadow: 0 2px 0 #000, inset 0 1px 0 rgba(255,255,255,.18) !important;
+  display: flex; align-items: center; justify-content: center;
+}
+.mp-btn:hover { filter: brightness(1.25); background: linear-gradient(180deg, #4e4368, #2a2238) !important; }
+.mp-btn:active { transform: translateY(2px); box-shadow: 0 0 0 #000, inset 0 1px 0 rgba(255,255,255,.14) !important; }
+.mp-play {
+  background: linear-gradient(180deg, #d4535e, #7a1a22) !important;
+  box-shadow: 0 2px 0 #3c0b11, inset 0 1px 0 rgba(255,255,255,.3) !important;
+}
+.mp-name {
+  font-family: var(--font-flavor) !important; font-style: normal !important;
+  font-size: 13px !important; color: var(--px-gold) !important; letter-spacing: .3px;
+  text-shadow: 1px 1px 0 #000;
+}
+.mp-time { font-family: var(--font-flavor) !important; font-size: 12px !important; color: var(--px-dim) !important; }
+/* blocky pixel sliders */
+.mp-seek, .mp-vol {
+  -webkit-appearance: none; appearance: none; height: 8px !important; border-radius: 0 !important;
+  border: 2px solid #000; cursor: pointer; image-rendering: pixelated;
+}
+.mp-seek { background: linear-gradient(90deg, var(--px-gold) var(--pct,0%), #0b0910 var(--pct,0%)) !important; }
+.mp-vol  { background: #0b0910 !important; }
+.mp-seek::-webkit-slider-thumb, .mp-vol::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 8px; height: 12px; border-radius: 0;
+  background: #e8c35a; border: 2px solid #000; box-shadow: 0 0 0 1px rgba(255,255,255,.3) inset;
+}
+.mp-seek::-moz-range-thumb, .mp-vol::-moz-range-thumb {
+  width: 8px; height: 12px; border-radius: 0; background: #e8c35a; border: 2px solid #000;
+}
