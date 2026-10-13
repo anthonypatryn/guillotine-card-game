@@ -274,7 +274,7 @@ function StartScreen({ onStart, onOnline, onResume }) {
             {!s.human && (
               <span className="seat-diffs">
                 {DIFFS.map(d => (
-                  <button key={d.key} className={'diff-btn' + (s.level === d.key ? ' on' : '')}
+                  <button key={d.key} data-lvl={d.key} className={'diff-btn' + (s.level === d.key ? ' on' : '')}
                     onClick={() => patch(i, { level: d.key })} title={d.hint}>{d.label}</button>
                 ))}
               </span>
@@ -1470,7 +1470,7 @@ function Lobby({ room, isHost, code, seats, onStart, onExit }) {
               <span className="ls-tag">{s.kind === 'host' ? 'host' : s.kind === 'ai' ? 'CPU' : (s.connected ? 'online' : 'offline')}</span></span>
             {isHost && s.kind === 'ai' && (
               <span className="seat-diffs">
-                {DIFFS.map((d) => <button key={d.key} className={'diff-btn' + ((s.level ?? 1) === d.key ? ' on' : '')}
+                {DIFFS.map((d) => <button key={d.key} data-lvl={d.key} className={'diff-btn' + ((s.level ?? 1) === d.key ? ' on' : '')}
                   onClick={() => room.setLevel(i, d.key)}>{d.label}</button>)}
               </span>
             )}

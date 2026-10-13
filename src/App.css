@@ -2149,3 +2149,31 @@ button { -webkit-appearance: none; appearance: none; }
 .breadcrumb .bc-sep { color: var(--px-dim); }
 .breadcrumb .bc-cur { color: var(--px-ink); text-shadow: 1px 1px 0 #000; }
 .breadcrumb .bc-tools { margin-left: auto; }
+
+/* ═══ Difficulty = French tricolor (blue easy, white med, red hard) ═══ */
+.start-screen .diff-btn[data-lvl="0"] { color: #8fb4e4 !important; }   /* Recrue — bleu */
+.start-screen .diff-btn[data-lvl="1"] { color: #e7e2d6 !important; }   /* Résistant — blanc */
+.start-screen .diff-btn[data-lvl="2"] { color: #e08289 !important; }   /* Maquisard — rouge */
+.start-screen .diff-btn[data-lvl="0"].on {
+  background: linear-gradient(180deg,#5a86c8,#2b4c8c) !important; color: #fff !important;
+  box-shadow: 0 3px 0 #16305e, inset 0 2px 0 rgba(255,255,255,.3) !important; text-shadow: 1px 1px 0 #000;
+}
+.start-screen .diff-btn[data-lvl="1"].on {
+  background: linear-gradient(180deg,#f4efe4,#c7c3b6) !important; color: #2a1d14 !important;
+  box-shadow: 0 3px 0 #7a766a, inset 0 2px 0 rgba(255,255,255,.6) !important; text-shadow: none;
+}
+.start-screen .diff-btn[data-lvl="2"].on {
+  background: linear-gradient(180deg,#d4535e,#7a1a22) !important; color: #fff !important;
+  box-shadow: 0 3px 0 #3c0b11, inset 0 2px 0 rgba(255,255,255,.25) !important; text-shadow: 1px 1px 0 #000;
+}
+/* lobby (non-start-screen) diff buttons too */
+.diff-btn[data-lvl="0"].on { border-color: #2b4c8c; color: #8fb4e4; }
+.diff-btn[data-lvl="1"].on { border-color: #c7c3b6; color: #f4efe4; }
+.diff-btn[data-lvl="2"].on { border-color: #a7303a; color: #e08289; }
+
+/* ═══ Player-card total score: brighter & legible ═══ */
+.pc-score .hs-num, .pc-top .headscore .hs-num {
+  color: #ffe08a !important; font-family: var(--font-display) !important;
+  font-size: 15px !important; font-weight: 400 !important;
+  text-shadow: 2px 2px 0 #000, 0 0 3px #000 !important;
+}
