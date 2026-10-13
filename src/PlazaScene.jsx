@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { NOBLE_SPRITES, SCENE_SPRITES, SPRITE_ALPHA as A, spriteSlug } from './data/sprites';
-import { NOBLE_BY_ID } from './data/cards';
+import { NOBLE_BY_ID, COLOR_HEX } from './data/cards';
 import { playBladeFall, playClang, playHeadBounce, playBloodDrops, isMuted } from './sound';
 
 // ── scene geometry (internal canvas resolution) ──
@@ -32,12 +32,17 @@ function gcanvas(spr, keep) { const c = document.createElement('canvas'); c.widt
 const inBlade = (x, y) => y >= 6 && y <= 11 && x >= 6 && x <= 17;
 function sprFor(def) { return NOBLE_SPRITES[spriteSlug(def.name)]; }
 
-export default function PlazaScene({ game, onNobleHover, onNobleClick }) {
+const PULL = 36;  // frames the executioner holds the lever-pull pose
+
+export default function PlazaScene({ game, onNobleHover, onNobleClick, canBehead, onBehead, ctaLabel }) {
   const canvasRef = useRef(null);
-  const sc = useRef({ vis: [], exec: null, queue: [], head: null, blood: [], floaters: [], shake: 0, rioters: [], smoke: [], seen: -1, geom: null });
+  const sc = useRef({ vis: [], exec: null, queue: [], head: null, blood: [], floaters: [], shake: 0, rioters: [], smoke: [], seen: -1, geom: null, execHover: false, execPull: 0, execBox: null });
   const gameRef = useRef(game); gameRef.current = game;
   const hoverCb = useRef(onNobleHover); hoverCb.current = onNobleHover;
   const clickCb = useRef(onNobleClick); clickCb.current = onNobleClick;
+  const beheadCb = useRef(onBehead); beheadCb.current = onBehead;
+  const canBeheadRef = useRef(canBehead); canBeheadRef.current = canBehead;
+  const labelRef = useRef(ctaLabel); labelRef.current = ctaLabel;
 
   // one-time init + rAF loop
   useEffect(() => {
@@ -99,7 +104,7 @@ export default function PlazaScene({ game, onNobleHover, onNobleClick }) {
     drawPlaza(ctx, s, t);
 
     // start a queued behead
-    if (!s.exec && s.queue.length && geom) { const q = s.queue.shift(); s.exec = { o: q.spr, def: q.def, x: q.startX, phase: 'walk', t: 0, wt: 0, blade: 0, bvel: 0, pileIdx: q.pileIdx }; s.exec.target = geom.HX - headCX(q.spr); if (!isMuted()) { /* footstep tick could go here */ } }
+    if (!s.exec && s.queue.length && geom) { const q = s.queue.shift(); s.exec = { o: q.spr, def: q.def, x: q.startX, phase: 'walk', t: 0, wt: 0, blade: 0, bvel: 0, pileIdx: q.pileIdx }; s.exec.target = geom.HX - headCX(q.spr); s.execPull = PULL; if (!isMuted()) { /* footstep tick could go here */ } }
 
     let bf = 0, showHole = false, sink = 1, walkDraw = false;
     const ex = s.exec;
@@ -127,10 +132,12 @@ export default function PlazaScene({ game, onNobleHover, onNobleClick }) {
       if (o._x < -w || o._x > W) continue;
       ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(o._x + w / 2, baseY + 2, w * 0.42, 5, 0, 0, 7); ctx.fill();
       ctx.save(); ctx.translate(o._x + w / 2 + ox, baseY - lift); ctx.rotate(rot); ctx.drawImage(c, -w / 2, -c.height); ctx.restore();
-      if (i === 0 && !s.exec) drawTag(ctx, o._x + w / 2, baseY - c.height - 6, 'NEXT');
+      drawPtsBadge(ctx, o._x + w / 2 + ox, baseY - lift - c.height - 3, o.def, i === 0 && !s.exec);
     }
     if (showHole) drawVictimHead(ctx, geom, ex.o, ex.x, sink);
-    drawExecutioner(ctx, geom);
+    const G0 = gameRef.current.G, ready = canBeheadRef.current && G0.actionPlayed && G0.line.length > 0;
+    if (s.execPull > 0) s.execPull--;
+    drawExecutioner(ctx, geom, s, t, s.execHover && canBeheadRef.current, ready, labelRef.current || 'Off with their head!');
     updateHead(ctx, s); updateBlood(ctx, s); updateFloaters(ctx, s);
     ctx.restore();
   }
@@ -138,7 +145,7 @@ export default function PlazaScene({ game, onNobleHover, onNobleClick }) {
   function sever(s) {
     const ex = s.exec, geom = s.geom, b = bounds(ex.o), ch = chunk(ex.o, b.top, NECK - 1), dir = Math.random() < .5 ? -1 : 1;
     const pile = pileCanvasPt(ex.pileIdx);
-    s.head = { c: ch, x: geom.HX - ch.width / 2, y: geom.HY - ch.height / 2, vx: dir * (1.2 + Math.random() * 4.5), vy: -(6.2 + Math.random() * 4.5), rot: 0, vr: (Math.random() < .5 ? -1 : 1) * (0.12 + Math.random() * 0.34), bounce: 0.4 + Math.random() * 0.34, rest: 0, life: 0, pile };
+    s.head = { c: ch, x: geom.HX - ch.width / 2, y: geom.HY - ch.height / 2, vx: dir * (1.4 + Math.random() * 4.8), vy: -(5.5 + Math.random() * 4.5), rot: 0, vr: (Math.random() < .5 ? -1 : 1) * (0.12 + Math.random() * 0.34), bounce: 0.46 + Math.random() * 0.32, rest: 0, life: 0, groundHits: 0, phase: 'bounce', pile };
     const tones = ['#8a0f14', '#a7303a', '#6e1620'];
     for (let k = 0; k < 42; k++) s.blood.push({ x: geom.HX, y: geom.HY + 4, vx: (Math.random() * 2 - 1) * 5.5, vy: -Math.random() * 7 - 1, life: 1, sz: S * (Math.random() < .3 ? 2 : 1), col: tones[k % 3] });
     ex.phase = 'fly'; ex.t = 0; playClang(); playBloodDrops();
@@ -146,14 +153,23 @@ export default function PlazaScene({ game, onNobleHover, onNobleClick }) {
   }
   function updateHead(ctx, s) {
     const h = s.head; if (!h) return;
-    h.life++;
-    if (h.life < 36) {                      // free bounce
-      h.vy += 0.4; h.x += h.vx; h.y += h.vy; h.rot += h.vr;
-      const gY = baseY - h.c.height;
-      if (h.y > gY) { h.y = gY; const imp = Math.abs(h.vy); if (imp > 1.6) playHeadBounce(Math.min(0.45, 0.12 + imp * 0.04)); h.vy *= -h.bounce; h.vx *= 0.75; h.vr *= 0.72; }
-    } else {                                 // home to the player's pile, shrinking
+    const gY = baseY - h.c.height;
+    if (h.phase !== 'home') {                 // bounce around on the ground first (the fun part)
+      h.vy += 0.4; h.x += h.vx; h.y += h.vy; h.rot += h.vr; h.life++;
+      if (h.x < 8) { h.x = 8; h.vx = Math.abs(h.vx) * 0.6; }        // keep it on screen
+      if (h.x > W - h.c.width - 8) { h.x = W - h.c.width - 8; h.vx = -Math.abs(h.vx) * 0.6; }
+      if (h.y >= gY) {                                               // ground impact
+        h.y = gY; const imp = Math.abs(h.vy);
+        if (imp > 1.1) { h.groundHits++; playHeadBounce(Math.min(0.45, 0.12 + imp * 0.045)); }
+        h.vy = -imp * h.bounce; h.vx *= 0.72; h.vr *= 0.66;
+        if (imp < 1.1) { h.vy = 0; h.vx *= 0.5; }                    // too weak to bounce → rolls
+      }
+      const settled = h.y >= gY - 0.5 && Math.abs(h.vy) < 1.0 && Math.abs(h.vx) < 0.45 && h.groundHits >= 2;
+      h.rest = settled ? h.rest + 1 : 0;
+      if (h.rest > 24 || h.life > 180) { h.phase = 'home'; h.vr *= 0.5; }   // sat long enough → fly to pile
+    } else {                                   // home to the player's pile, shrinking
       h.x += (h.pile.x - h.c.width / 2 - h.x) * 0.16; h.y += (h.pile.y - h.c.height / 2 - h.y) * 0.16; h.rot += h.vr * 0.3; h.vr *= 0.94;
-      h.scale = (h.scale ?? 1) * 0.93;
+      h.scale = (h.scale ?? 1) * 0.92;
       if (h.scale < 0.18) { s.head = null; return; }
     }
     ctx.save(); ctx.translate(h.x + h.c.width / 2, h.y + h.c.height / 2); ctx.rotate(h.rot); const sc2 = h.scale ?? 1; ctx.scale(sc2, sc2); ctx.drawImage(h.c, -h.c.width / 2, -h.c.height / 2); ctx.restore();
@@ -179,15 +195,29 @@ export default function PlazaScene({ game, onNobleHover, onNobleClick }) {
     for (let i = 0; i < s.vis.length; i++) { const o = s.vis[i]; if (!o.spr) continue; const c = spriteCanvas(o.spr), w = o.spr.w * S, top = baseY - c.height; if (mx >= o._x && mx <= o._x + w && my >= top - 6 && my <= baseY) return { i, o, top, w }; }
     return null;
   }
+  function execAt(e) {
+    const cv = canvasRef.current, r = cv.getBoundingClientRect(), sx = W / r.width, sy = Hc / r.height;
+    const mx = (e.clientX - r.left) * sx, my = (e.clientY - r.top) * sy, b = sc.current.execBox;
+    return b && mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h;
+  }
   function onMove(e) {
-    const hit = at(e); const cv = canvasRef.current; cv.style.cursor = hit ? 'pointer' : 'default';
+    const s = sc.current, cv = canvasRef.current;
+    // executioner is the behead button when it's your turn
+    if (canBeheadRef.current && execAt(e)) {
+      s.execHover = true; cv.style.cursor = 'pointer'; hoverCb.current && hoverCb.current(null); return;
+    }
+    s.execHover = false;
+    const hit = at(e); cv.style.cursor = hit ? 'pointer' : 'default';
     if (!hit || !hoverCb.current) { hoverCb.current && hoverCb.current(null); return; }
     const r = cv.getBoundingClientRect(), invx = r.width / W, invy = r.height / Hc;
     const rect = { left: r.left + hit.o._x * invx, top: r.top + hit.top * invy, width: hit.w * invx, height: (baseY - hit.top) * invy, right: r.left + (hit.o._x + hit.w) * invx, bottom: r.top + baseY * invy };
     hoverCb.current(hit.o.def, rect);
   }
-  function onLeave() { hoverCb.current && hoverCb.current(null); }
-  function onClick(e) { const hit = at(e); if (hit && clickCb.current) clickCb.current(hit.i); }
+  function onLeave() { sc.current.execHover = false; hoverCb.current && hoverCb.current(null); }
+  function onClick(e) {
+    if (canBeheadRef.current && execAt(e)) { sc.current.execPull = PULL; beheadCb.current && beheadCb.current(); return; }
+    const hit = at(e); if (hit && clickCb.current) clickCb.current(hit.i);
+  }
 
   return <canvas ref={canvasRef} width={W} height={Hc} className="plaza-scene"
     onMouseMove={onMove} onMouseLeave={onLeave} onClick={onClick} aria-label="The condemned line" />;
@@ -195,11 +225,91 @@ export default function PlazaScene({ game, onNobleHover, onNobleClick }) {
 
 // ── drawing helpers (module scope; take ctx) ──
 function drawTag(ctx, cx, y, txt) { ctx.font = "7px 'Press Start 2P',monospace"; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; const w = ctx.measureText(txt).width + 8; ctx.fillStyle = '#c8a24a'; ctx.fillRect(cx - w / 2, y - 10, w, 12); ctx.fillStyle = '#140d08'; ctx.fillText(txt, cx, y - 1); ctx.textAlign = 'left'; }
+// Permanent point value above each noble's head, colored by faction, for quick glancing.
+function drawPtsBadge(ctx, cx, y, def, isNext) {
+  const pts = (def.pts === null || def.pts === undefined) ? '?' : String(def.pts);
+  ctx.font = "8px 'Press Start 2P',monospace"; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  const bw = Math.max(15, ctx.measureText(pts).width + 9), bh = 13, bx = cx - bw / 2, by = y - bh;
+  const col = COLOR_HEX[def.color] || '#8a8a8a';
+  ctx.fillStyle = '#000'; ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
+  ctx.fillStyle = col; ctx.fillRect(bx, by, bw, bh);
+  ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(bx, by, bw, 3);
+  ctx.fillStyle = '#fff'; ctx.fillText(pts, cx, by + bh - 3);
+  if (isNext) drawTag(ctx, cx, by - 5, 'NEXT');
+  ctx.textAlign = 'left';
+}
 function victimTopY(geom, o, sink) { const b = bounds(o), groundTop = baseY - (b.bot + 1) * S, midHead = (b.top + NECK) / 2, holeTop = geom.HY - midHead * S; return groundTop + (holeTop - groundTop) * sink; }
 function drawVictimBehind(ctx, geom, o, x, sink) { const b = bounds(o), c = spriteCanvas(o), topY = victimTopY(geom, o, sink); ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, baseY); ctx.clip(); ctx.drawImage(c, x, topY + b.top * S); ctx.restore(); }
 function drawVictimHead(ctx, geom, o, x, sink) { const b = bounds(o), c = spriteCanvas(o), topY = victimTopY(geom, o, sink); ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, topY + NECK * S); ctx.clip(); ctx.drawImage(c, x, topY + b.top * S); ctx.restore(); }
 function drawShuffle(ctx, ex) { const o = ex.o, c = spriteCanvas(o), wt = ex.wt || 0, wob = Math.sin(wt * 0.45), lift = Math.abs(Math.sin(wt * 0.45)) * 2; ctx.save(); ctx.translate(ex.x + c.width / 2 + wob * 2.2, baseY - lift); ctx.rotate(wob * 0.035); ctx.drawImage(c, -c.width / 2, -c.height); ctx.restore(); }
-function drawExecutioner(ctx, geom) { const e = SCENE_SPRITES.executioner; if (!e || !geom) return; const c = spriteCanvas(e), ex2 = Math.min(W - c.width - 2, geom.gx0 + geom.GBODY.width - 10); ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(ex2 + c.width / 2, baseY + 2, c.width * 0.4, 5, 0, 0, 7); ctx.fill(); ctx.drawImage(c, ex2, baseY - c.height); }
+function lerp(a, b, k) { return a + (b - a) * k; }
+// A blocky (solid-color, pixel) line of square cells — no anti-aliasing, no gradient.
+function pxLine(ctx, x0, y0, x1, y1, bs, col) {
+  const dx = x1 - x0, dy = y1 - y0, steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / (bs * 0.5)));
+  ctx.fillStyle = col;
+  for (let i = 0; i <= steps; i++) { const x = Math.round(x0 + dx * i / steps), y = Math.round(y0 + dy * i / steps); ctx.fillRect(x - (bs >> 1), y - (bs >> 1), bs, bs); }
+}
+// The executioner IS the behead button. Lever is ALWAYS visible; he reaches out for
+// it on hover and yanks it on pull. All solid-color pixels — no gradients.
+function drawExecutioner(ctx, geom, s, t, hover, ready, label) {
+  const e = SCENE_SPRITES.executioner; if (!e || !geom) return;
+  const c = spriteCanvas(e), ex2 = Math.min(W - c.width - 2, geom.gx0 + geom.GBODY.width - 10);
+  const execTop = baseY - c.height, execW = c.width, execH = c.height;
+
+  // lever geometry (left of the executioner, by the frame)
+  const Lx = ex2 - 6, pivotY = baseY - 4, LVL = Math.round(execH * 0.52);
+  const up = { x: Lx + 3, y: pivotY - LVL }, down = { x: Lx - LVL * 0.72, y: pivotY - LVL * 0.26 };
+  const pullK = s.execPull > 0 ? Math.sin((1 - s.execPull / PULL) * Math.PI) : 0;   // 0→1→0
+  const hx = Math.round(lerp(up.x, down.x, pullK)), hy = Math.round(lerp(up.y, down.y, pullK));
+
+  s.execBox = { x: Lx - LVL, y: execTop - 16, w: (ex2 + execW) - (Lx - LVL), h: baseY - (execTop - 16) + 4 };
+
+  // ready: pulsing solid-pixel highlight (outline box + bobbing chevron), no gradient
+  if (ready && s.execPull <= 0) {
+    const a = 0.3 + 0.35 * (0.5 + 0.5 * Math.sin(t / 200));
+    ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, a));
+    ctx.strokeStyle = '#e8c35a'; ctx.lineWidth = 3; ctx.strokeRect(ex2 - 4.5, execTop - 4.5, execW + 9, execH + 9);
+    ctx.globalAlpha = 1; const bob = Math.round(Math.sin(t / 150) * 3), axc = ex2 + execW / 2, ayt = execTop - 26 + bob;
+    ctx.fillStyle = '#e8c35a'; for (let r = 0; r < 4; r++) { const ww = (4 - r) * 4; ctx.fillRect(axc - ww / 2, ayt + r * 3, ww, 3); }
+    ctx.restore();
+  }
+
+  // shadow + sprite
+  ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(ex2 + execW / 2, baseY + 2, execW * 0.4, 5, 0, 0, 7); ctx.fill();
+  ctx.drawImage(c, ex2, execTop);
+
+  // lever — ALWAYS visible, solid pixel blocks (black outline + metal fill + red knob)
+  pxLine(ctx, Lx, pivotY, hx, hy, 8, '#17181c');
+  pxLine(ctx, Lx, pivotY, hx, hy, 5, '#6b6f78');
+  ctx.fillStyle = '#17181c'; ctx.fillRect(Lx - 4, pivotY - 4, 8, 8);           // pivot bolt
+  ctx.fillStyle = '#4e525a'; ctx.fillRect(Lx - 2, pivotY - 2, 4, 4);
+  ctx.fillStyle = '#17181c'; ctx.fillRect(hx - 6, hy - 6, 12, 12);             // knob
+  ctx.fillStyle = '#a7303a'; ctx.fillRect(hx - 4, hy - 4, 8, 8);
+  ctx.fillStyle = '#e06a6a'; ctx.fillRect(hx - 4, hy - 4, 3, 3);
+
+  // arm reaches out for the lever on hover / follows it down on pull
+  if (hover || s.execPull > 0) {
+    const Sx = ex2 + execW * 0.2, Sy = execTop + execH * 0.3;
+    const ax = s.execPull > 0 ? hx : up.x, ay = s.execPull > 0 ? hy : up.y;
+    pxLine(ctx, Sx, Sy, ax, ay, 8, '#17130d');      // sleeve outline
+    pxLine(ctx, Sx, Sy, ax, ay, 5, '#2a2018');      // sleeve
+    ctx.fillStyle = '#cda47e'; ctx.fillRect(Math.round(ax) - 4, Math.round(ay) - 4, 8, 8);  // hand
+  }
+  // tooltip on hover
+  if (hover) {
+    const txt = (label || '').toUpperCase();
+    ctx.font = "9px 'Press Start 2P',monospace"; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    const tw = ctx.measureText(txt).width + 16;
+    let bx = ex2 + execW / 2; bx = Math.max(tw / 2 + 6, Math.min(W - tw / 2 - 6, bx));
+    const by = execTop - 20;
+    ctx.fillStyle = '#000'; ctx.fillRect(bx - tw / 2 - 2, by - 2, tw + 4, 22);
+    ctx.fillStyle = '#e8c35a'; ctx.fillRect(bx - tw / 2, by, tw, 18);
+    ctx.fillStyle = '#2a1d14'; ctx.fillText(txt, bx, by + 13);
+    const px = Math.max(bx - tw / 2 + 6, Math.min(bx + tw / 2 - 6, ex2 + execW / 2));
+    ctx.fillStyle = '#e8c35a'; ctx.fillRect(px - 3, by + 18, 6, 4);
+    ctx.textAlign = 'left';
+  }
+}
 function eiffel(ctx, ex, baseline, h, col) { ctx.fillStyle = col; const topY = baseline - h, midY = topY + h * 0.45, sp = h * 0.22; ctx.fillRect(ex - 1, topY - 8, 2, 8); ctx.beginPath(); ctx.moveTo(ex - 3, midY); ctx.lineTo(ex - 1.5, topY); ctx.lineTo(ex + 1.5, topY); ctx.lineTo(ex + 3, midY); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(ex - 3, midY); ctx.lineTo(ex - sp, baseline); ctx.lineTo(ex - sp + 6, baseline); ctx.lineTo(ex - 1, midY); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(ex + 3, midY); ctx.lineTo(ex + sp, baseline); ctx.lineTo(ex + sp - 6, baseline); ctx.lineTo(ex + 1, midY); ctx.closePath(); ctx.fill(); ctx.fillRect(ex - 9, midY - 1, 18, 3); ctx.fillRect(ex - sp * 0.75, baseline - h * 0.3, sp * 1.5, 3); }
 function drawSkyline(ctx, wallTop) { ctx.save(); ctx.globalAlpha = 0.9; const tops = [16, 28, 12, 24, 34, 14, 22, 30, 12, 26, 18, 32, 14, 20, 28, 16]; ctx.fillStyle = '#2c2636'; for (let bx = -12, i = 0; bx < W + 12; bx += 60, i++) { const hh = tops[i % tops.length]; ctx.fillRect(bx, wallTop - hh, 50, hh); } ctx.fillStyle = '#342d40'; ctx.beginPath(); ctx.arc(236, wallTop - 24, 18, Math.PI, 0); ctx.fill(); ctx.fillRect(218, wallTop - 24, 36, 24); ctx.fillRect(234, wallTop - 40, 2, 16); ctx.beginPath(); ctx.arc(640, wallTop - 20, 14, Math.PI, 0); ctx.fill(); ctx.fillRect(626, wallTop - 20, 28, 20); eiffel(ctx, 430, wallTop, 120, '#3a3348'); ctx.restore(); }
 function drawPlaza(ctx, s, t) {

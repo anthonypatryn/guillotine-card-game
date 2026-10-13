@@ -713,14 +713,15 @@ function Board({ game }) {
         {locks.length > 0 && <div className="locks">{locks.map((l, i) => <span key={i} className="lock-chip">{l}</span>)}</div>}
 
         <div className="plaza-wrap">
-          <PlazaScene game={game} onNobleHover={plazaHover} onNobleClick={plazaClick} />
-          <div className="plaza-controls">
-            <button className={'guillo-btn' + (canBehead ? ' live pulse' : '')}
-              onClick={canBehead ? game.collectAndEnd : undefined} disabled={!canBehead}
-              title={canBehead ? `${beheadCta} (Space)` : 'Wait for your turn'}>{beheadCta}</button>
-            {targeting && <button className="btn small" onClick={game.cancelTarget} title="Cancel (Esc)">Cancel</button>}
-            {game.canUndo() && <button className="btn small" onClick={game.undo} title="Undo (U)">↶ Undo</button>}
-          </div>
+          <PlazaScene game={game} onNobleHover={plazaHover} onNobleClick={plazaClick}
+            canBehead={canBehead} onBehead={game.collectAndEnd} ctaLabel={beheadCta} />
+          {(targeting || game.canUndo()) && (
+            <div className="plaza-controls">
+              {targeting && <button className="btn small" onClick={game.cancelTarget} title="Cancel (Esc)">Cancel</button>}
+              {game.canUndo() && <button className="btn small" onClick={game.undo} title="Undo (U)">↶ Undo</button>}
+            </div>
+          )}
+          {canBehead && <p className="behead-hint">Click the executioner to behead{G.line.length === 0 ? ' / end turn' : ''} <span className="bh-key">Space</span></p>}
         </div>
 
         <HandDock game={game} seat={handSeat} canPlay={handPlayable} onOpen={setCardOpen} />
