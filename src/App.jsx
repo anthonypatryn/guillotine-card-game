@@ -261,6 +261,7 @@ function StartScreen({ onStart, onOnline, onResume }) {
       <div className="start-links">
         <a className="hof-link" href="?view=stats">Hall of Fame →</a>
         <a className="hof-link" href="?view=bugs">Bug reports (PIN) →</a>
+        <a className="hof-link" href="/tools.html">Pixel Tools →</a>
       </div>
     </div>
   );

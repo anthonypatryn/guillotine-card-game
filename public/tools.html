@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pixel Tools — Guillotine</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap">
+<style>
+  :root{
+    --bg:#0c0912; --panel:#16111f; --panel2:#241d30; --ink:#f3e7cf; --dim:#9a8f7a;
+    --gold:#e8c35a; --blood:#a7303a; --blood2:#c8404b; --line:#3a2f52;
+    --font-px:'Press Start 2P',monospace; --font-sc:'Silkscreen',monospace;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{min-height:100%;color:var(--ink);font-family:var(--font-sc);
+    background:
+      url('/fleur-gold.svg') 0 0/84px 84px repeat,
+      repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0 2px,transparent 2px 4px),
+      radial-gradient(120% 80% at 50% 0%,#241d30 0%,#120d1c 55%,#0a0710 100%) fixed;
+    background-blend-mode:soft-light,normal,normal;
+    image-rendering:pixelated;}
+  .veil{position:fixed;inset:0;background:rgba(12,9,18,.72);z-index:-1}
+  .wrap{max-width:860px;margin:0 auto;padding-block:30px;padding-left:16px;padding-right:16px}
+  .logo{display:block;width:min(80vw,360px);margin:0 auto 6px;image-rendering:pixelated;filter:drop-shadow(0 4px 0 rgba(0,0,0,.55))}
+  h1{font-family:var(--font-px);font-size:14px;text-align:center;letter-spacing:1px;margin:10px 0 2px;color:var(--gold);text-shadow:2px 2px 0 #000}
+  .sub{text-align:center;color:var(--dim);font-size:15px;margin:0 0 6px}
+  .note{text-align:center;color:var(--dim);font-size:13px;margin:0 auto 22px;max-width:520px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+  a.card{display:flex;flex-direction:column;gap:8px;text-decoration:none;color:var(--ink);
+    background:linear-gradient(180deg,var(--panel2),var(--panel));
+    border:3px solid #000;box-shadow:0 5px 0 #000, inset 0 0 0 2px rgba(255,255,255,.04);
+    padding:14px;transition:none}
+  a.card:hover{filter:brightness(1.12);transform:translateY(-1px)}
+  a.card:active{transform:translateY(3px);box-shadow:0 2px 0 #000, inset 0 0 0 2px rgba(255,255,255,.04)}
+  .ct{font-family:var(--font-px);font-size:10px;color:var(--gold);letter-spacing:.5px;text-shadow:1px 1px 0 #000;line-height:1.4}
+  .cd{font-size:15px;color:var(--dim);line-height:1.4}
+  .go{font-family:var(--font-px);font-size:8px;color:var(--ink);margin-top:auto}
+  .card.play .ct{color:#ffd0d0}
+  .card.play{background:linear-gradient(180deg,#d4535e,#7a1a22);box-shadow:0 5px 0 #3c0b11, inset 0 2px 0 rgba(255,255,255,.18)}
+  .card.play .cd{color:#f3dada}
+  .foot{text-align:center;color:var(--dim);font-size:13px;margin-top:26px}
+  .foot a{color:var(--gold)}
+  .sect{font-family:var(--font-px);font-size:9px;color:var(--dim);letter-spacing:1px;margin:24px 0 10px;text-transform:uppercase;
+    border-bottom:3px solid #000;padding-bottom:6px}
+</style>
+</head>
+<body>
+<div class="veil"></div>
+<div class="wrap">
+  <img class="logo" src="/logo-guillotine.svg" alt="Guillotine">
+  <h1>Pixel Tools</h1>
+  <p class="sub">Every editor + preview for the pixel art.</p>
+  <p class="note">The editors are private Claude Artifacts — they open in Claude and only you can access them (sign in if prompted).</p>
+
+  <div class="sect">Editors</div>
+  <div class="grid">
+    <a class="card" href="https://claude.ai/artifact/9oS4SRnS6WBGhCVQ9UdnDW" target="_blank" rel="noopener">
+      <span class="ct">Logo Editor</span>
+      <span class="cd">Paint, reduce colors, and clean up the wordmark. Save★ then tell Claude “pull the logo.”</span>
+      <span class="go">OPEN →</span>
+    </a>
+    <a class="card" href="https://claude.ai/artifact/4ZFV23v7EigSKwkzXNb113" target="_blank" rel="noopener">
+      <span class="ct">Noble Pixel Forge</span>
+      <span class="cd">Draw the noble figures + guillotine/executioner scene sprites (24×32 editor).</span>
+      <span class="go">OPEN →</span>
+    </a>
+  </div>
+
+  <div class="sect">Previews</div>
+  <div class="grid">
+    <a class="card" href="https://claude.ai/artifact/GobjqZE2pdZk6rG4wEztSn" target="_blank" rel="noopener">
+      <span class="ct">The Condemned Line</span>
+      <span class="cd">The lineup + full behead animation preview the game scene is built from.</span>
+      <span class="go">OPEN →</span>
+    </a>
+    <a class="card" href="https://claude.ai/artifact/1r2TTbBSK5ey2FcD8QtYQ2" target="_blank" rel="noopener">
+      <span class="ct">Art Review</span>
+      <span class="cd">Gallery of every sprite — 40 nobles + 50 action cards + logo.</span>
+      <span class="go">OPEN →</span>
+    </a>
+  </div>
+
+  <div class="sect">Game</div>
+  <div class="grid">
+    <a class="card play" href="/">
+      <span class="ct">Play Guillotine</span>
+      <span class="cd">Back to the live game.</span>
+      <span class="go">PLAY →</span>
+    </a>
+    <a class="card" href="?view=art">
+      <span class="ct">In-game Art View</span>
+      <span class="cd">The baked sprite gallery inside the app (dev view).</span>
+      <span class="go">OPEN →</span>
+    </a>
+  </div>
+
+  <p class="foot">Bookmark this page: <b>/tools.html</b> · <a href="/">← back to the game</a></p>
+</div>
+</body>
+</html>
