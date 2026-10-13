@@ -278,21 +278,26 @@ function drawExecutioner(ctx, geom, s, t, hover, ready, label) {
   ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(ex2 + execW / 2, baseY + 2, execW * 0.4, 5, 0, 0, 7); ctx.fill();
   ctx.drawImage(c, ex2, execTop);
 
-  // lever — ALWAYS visible, solid pixel blocks (black outline + metal fill + red knob)
-  pxLine(ctx, Lx, pivotY, hx, hy, 8, '#17181c');
-  pxLine(ctx, Lx, pivotY, hx, hy, 5, '#6b6f78');
-  ctx.fillStyle = '#17181c'; ctx.fillRect(Lx - 4, pivotY - 4, 8, 8);           // pivot bolt
-  ctx.fillStyle = '#4e525a'; ctx.fillRect(Lx - 2, pivotY - 2, 4, 4);
-  ctx.fillStyle = '#17181c'; ctx.fillRect(hx - 6, hy - 6, 12, 12);             // knob
-  ctx.fillStyle = '#a7303a'; ctx.fillRect(hx - 4, hy - 4, 8, 8);
-  ctx.fillStyle = '#e06a6a'; ctx.fillRect(hx - 4, hy - 4, 3, 3);
+  // lever sprite if one has been drawn in the forge; otherwise a plain solid-pixel
+  // lever (no outline). The sprite rotates around its pivot for the pull.
+  const lever = SCENE_SPRITES.lever;
+  if (lever) {
+    const lc = spriteCanvas(lever), ang = pullK * (Math.PI * 0.42);  // swing down on pull
+    ctx.save(); ctx.translate(Lx, pivotY); ctx.rotate(ang);
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(lc, -lc.width / 2, -lc.height + 4);
+    ctx.restore();
+  } else {
+    pxLine(ctx, Lx, pivotY, hx, hy, 5, '#6b6f78');           // metal arm, solid
+    ctx.fillStyle = '#4e525a'; ctx.fillRect(Lx - 2, pivotY - 2, 4, 4);   // pivot
+    ctx.fillStyle = '#a7303a'; ctx.fillRect(hx - 4, hy - 4, 8, 8);       // knob
+    ctx.fillStyle = '#e06a6a'; ctx.fillRect(hx - 4, hy - 4, 3, 3);
+  }
 
-  // arm reaches out for the lever on hover / follows it down on pull
+  // arm reaches out for the lever on hover / follows it down on pull (solid, no outline)
   if (hover || s.execPull > 0) {
     const Sx = ex2 + execW * 0.2, Sy = execTop + execH * 0.3;
     const ax = s.execPull > 0 ? hx : up.x, ay = s.execPull > 0 ? hy : up.y;
-    pxLine(ctx, Sx, Sy, ax, ay, 8, '#17130d');      // sleeve outline
-    pxLine(ctx, Sx, Sy, ax, ay, 5, '#2a2018');      // sleeve
+    pxLine(ctx, Sx, Sy, ax, ay, 5, '#2a2018');      // sleeve, solid
     ctx.fillStyle = '#cda47e'; ctx.fillRect(Math.round(ax) - 4, Math.round(ay) - 4, 8, 8);  // hand
   }
   // tooltip on hover

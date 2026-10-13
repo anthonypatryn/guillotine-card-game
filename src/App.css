@@ -2027,3 +2027,40 @@ button { -webkit-appearance: none; appearance: none; }
   margin: 6px 0 0; letter-spacing: .3px; }
 .behead-hint .bh-key { font-family: var(--font-display); font-size: 7px; background: #0b0910; border: 2px solid #000;
   color: var(--px-gold); padding: 2px 4px; margin-left: 4px; }
+
+/* ═══ VIEW-HEADS MODAL: physics pile + tools + tidy spacing ═══ */
+.pile-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 2px 0 10px; }
+.pt-group { display: inline-flex; gap: 0; }
+.pile-tog {
+  font-family: var(--font-display); font-size: 8px; letter-spacing: .5px; color: var(--px-ink);
+  background: linear-gradient(180deg, #37304a, #221b2e); border: 3px solid #000; border-radius: 0;
+  padding: 8px 10px; cursor: pointer; text-shadow: 1px 1px 0 #000;
+  box-shadow: 0 3px 0 #000, inset 0 2px 0 rgba(255,255,255,.1);
+}
+.pt-group .pile-tog { border-right-width: 0; }
+.pt-group .pile-tog:last-child { border-right-width: 3px; }
+.pile-tog:hover { filter: brightness(1.18); }
+.pile-tog:active { transform: translateY(3px); box-shadow: 0 0 0 #000, inset 0 2px 0 rgba(255,255,255,.1); }
+.pile-tog.on {
+  color: #2a1d14; background: linear-gradient(180deg, #f6dd8a, #e8c35a 50%, #b4882e);
+  box-shadow: 0 3px 0 #6e4a12, inset 0 2px 0 rgba(255,255,255,.5); text-shadow: none;
+}
+.pile-canvas {
+  display: block; width: 100%; max-width: 540px; height: auto; margin: 0 auto;
+  background: #0b0910; border: 3px solid #000; box-shadow: inset 0 3px 0 rgba(0,0,0,.5);
+  image-rendering: pixelated;
+}
+.pile-canvas.pickable { cursor: pointer; border-color: var(--px-gold); }
+.pile-empty { text-align: center; padding: 40px 10px; color: var(--px-dim); font-family: var(--font-flavor); font-size: 18px; }
+.pile-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; padding: 6px 2px; max-height: 50vh; overflow: auto; }
+.pile-fullcard {
+  width: 92px; height: auto; border: 3px solid #000; image-rendering: pixelated;
+  box-shadow: 0 3px 0 #000; transition: none;
+}
+.pile-fullcard.clickable { cursor: pointer; outline: 3px solid var(--px-gold); }
+.pile-fullcard:hover { filter: brightness(1.1); transform: translateY(-2px); }
+/* tidy the breakdown table (was touching the edges) */
+.pile-breakdown { max-width: 420px; margin: 12px auto 0; padding: 8px 16px;
+  border: 3px solid #000; background: #0e0b14; }
+.pile-breakdown .bd-row { padding: 3px 2px; font-family: var(--font-flavor); font-size: 15px; }
+.pile-modal { padding: 16px !important; }

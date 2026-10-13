@@ -1188,27 +1188,100 @@ function NobleViewer({ game, viewer, step, index, setIndex, onClose }) {
 }
 
 // ─── Expandable view of a player's collected heads ──────────────────────────
+// The collected heads spill in from the top and pile up with simple 2D physics.
+const PILE_RANK = { red: 0, blue: 1, green: 2, purple: 3, gray: 4 };
+function HeadPileCanvas({ entries, sig, sortColor, pickable, onPick }) {
+  const ref = useRef(null);
+  const entriesRef = useRef(entries); entriesRef.current = entries;
+  const pickRef = useRef(onPick); pickRef.current = onPick;
+  const stateRef = useRef({ bodies: [], imgs: {} });
+  const CW = 540, CH = 300;
+  useEffect(() => {
+    const cv = ref.current; if (!cv) return;
+    const s = stateRef.current, list = entriesRef.current;
+    list.forEach(e => { const src = headImg(e.def); if (src && !s.imgs[e.def.name]) { const im = new Image(); im.src = src; s.imgs[e.def.name] = im; } });
+    const R = 22, GR = 0.55, REST = 0.34, FR = 0.82;
+    let frame = 0; s.bodies = [];
+    const queue = list.map((e, i) => ({ ...e, releaseAt: i * 4 }));
+    let raf;
+    const loop = () => {
+      const ctx = cv.getContext('2d'); ctx.clearRect(0, 0, CW, CH); ctx.imageSmoothingEnabled = false; frame++;
+      while (queue.length && queue[0].releaseAt <= frame) {
+        const e = queue.shift();
+        const zone = sortColor ? ((PILE_RANK[e.def.color] ?? 2) + 0.5) / 5 * CW : R + Math.random() * (CW - 2 * R);
+        s.bodies.push({ def: e.def, pi: e.pi, x: Math.min(CW - R, Math.max(R, zone + (Math.random() * 24 - 12))), y: -R - Math.random() * 60, vx: (Math.random() * 2 - 1) * 1.2, vy: 1 + Math.random() * 1.5, rot: (Math.random() * 2 - 1) * 0.5, r: R });
+      }
+      for (const b of s.bodies) { b.vy += GR; b.x += b.vx; b.y += b.vy; b.rot += b.vx * 0.02; }
+      for (let it = 0; it < 4; it++) for (let i = 0; i < s.bodies.length; i++) {
+        const a = s.bodies[i];
+        if (a.x < a.r) { a.x = a.r; a.vx = Math.abs(a.vx) * REST; }
+        if (a.x > CW - a.r) { a.x = CW - a.r; a.vx = -Math.abs(a.vx) * REST; }
+        if (a.y > CH - a.r) { a.y = CH - a.r; a.vy = -Math.abs(a.vy) * REST; a.vx *= FR; }
+        for (let j = i + 1; j < s.bodies.length; j++) {
+          const c = s.bodies[j]; let dx = c.x - a.x, dy = c.y - a.y, d = Math.hypot(dx, dy) || 0.01, min = a.r + c.r;
+          if (d < min) { const ov = (min - d) / 2, nx = dx / d, ny = dy / d; a.x -= nx * ov; a.y -= ny * ov; c.x += nx * ov; c.y += ny * ov; const rel = (c.vx - a.vx) * nx + (c.vy - a.vy) * ny; if (rel < 0) { const imp = rel * 0.5; a.vx += imp * nx; a.vy += imp * ny; c.vx -= imp * nx; c.vy -= imp * ny; } }
+        }
+      }
+      for (const b of s.bodies) {
+        const im = s.imgs[b.def.name]; ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rot);
+        if (im && im.complete && im.naturalWidth) { const h = b.r * 2.1, w = h * (im.naturalWidth / im.naturalHeight); ctx.drawImage(im, -w / 2, -h / 2, w, h); }
+        else { ctx.fillStyle = COLOR_HEX[b.def.color] || '#888'; ctx.fillRect(-b.r, -b.r, b.r * 2, b.r * 2); }
+        ctx.restore();
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sig]);
+  const onClick = (e) => {
+    if (!pickRef.current) return;
+    const cv = ref.current, r = cv.getBoundingClientRect(), sx = CW / r.width, sy = CH / r.height;
+    const mx = (e.clientX - r.left) * sx, my = (e.clientY - r.top) * sy, b = stateRef.current.bodies;
+    for (let i = b.length - 1; i >= 0; i--) if (Math.hypot(b[i].x - mx, b[i].y - my) <= b[i].r) { pickRef.current(b[i].pi); return; }
+  };
+  return <canvas ref={ref} width={CW} height={CH} className={'pile-canvas' + (pickable ? ' pickable' : '')} onClick={onClick}
+    title={pickable ? 'Click a head to take it' : ''} />;
+}
+
 function NoblePileModal({ G, index, game, step, onInspect, forced, close }) {
   const player = G.players[index];
   const { total, lines } = computeScore(player);
   const pileTarget = step && step.type === 'pileNoble' && step.playerIdx === index;
   const poss = player.name === 'You' ? 'Your heads' : `${player.name}'s heads`;
+  const [sortColor, setSortColor] = useState(false);
+  const [fullCards, setFullCards] = useState(false);
+  const onPick = (pi) => { if (pileTarget && step.candidates.includes(pi)) { game.pick({ idx: pi }); close(); } };
+  let order = player.scorePile.map((inst, pi) => ({ inst, pi, def: NOBLE_BY_ID[inst.defId] }));
+  if (sortColor) order = [...order].sort((a, b) => (PILE_RANK[a.def.color] ?? 9) - (PILE_RANK[b.def.color] ?? 9));
+  const entries = order.map(o => ({ def: o.def, pi: o.pi }));
+  const sig = sortColor + '|' + entries.map(e => e.pi).join(',');
   return (
     <div className="modal-backdrop" onClick={close}>
       <div className="modal pile-modal" onClick={e => e.stopPropagation()}>
         <p className="modal-title">{poss} — {total} pts{pileTarget ? ' · choose one to take' : ''}</p>
-        <div className="pile-grid">
-          {player.scorePile.length === 0 && <span className="muted">No heads yet.</span>}
-          {player.scorePile.map((inst, pi) => {
-            const def = NOBLE_BY_ID[inst.defId];
-            const clickable = pileTarget && step.candidates.includes(pi);
-            return <SlicedThumb key={inst.uid} defId={inst.defId} uid={inst.uid}
-              className={'pile-card' + (clickable ? ' clickable' : '')}
-              title={`${def.name} (${COLORS[def.color]})`}
-              onMouseEnter={(e) => onInspect(nobleInspect(def, e.currentTarget, null, G.line))} onMouseLeave={() => onInspect(null)}
-              onClick={clickable ? () => { game.pick({ idx: pi }); close(); } : undefined} />;
-          })}
+        <div className="pile-tools">
+          <span className="pt-group">
+            <button className={'pile-tog' + (!fullCards ? ' on' : '')} onClick={() => setFullCards(false)}>Pile</button>
+            <button className={'pile-tog' + (fullCards ? ' on' : '')} onClick={() => setFullCards(true)}>Full cards</button>
+          </span>
+          <button className={'pile-tog' + (sortColor ? ' on' : '')} onClick={() => setSortColor(v => !v)}>Sort by color</button>
         </div>
+        {player.scorePile.length === 0 ? (
+          <div className="pile-empty">No heads yet.</div>
+        ) : fullCards ? (
+          <div className="pile-grid">
+            {order.map(({ inst, pi, def }) => {
+              const clickable = pileTarget && step.candidates.includes(pi);
+              return <img key={inst.uid} className={'pile-fullcard' + (clickable ? ' clickable' : '')} src={nobleImg(def.id)} alt={def.name}
+                title={`${def.name} (${COLORS[def.color]})`}
+                onMouseEnter={(e) => onInspect(nobleInspect(def, e.currentTarget, null, G.line))} onMouseLeave={() => onInspect(null)}
+                onClick={clickable ? () => onPick(pi) : undefined} />;
+            })}
+          </div>
+        ) : (
+          <HeadPileCanvas entries={entries} sig={sig} sortColor={sortColor} pickable={pileTarget} onPick={onPick} />
+        )}
         {lines.length > 0 && (
           <div className="pile-breakdown">
             {lines.map((l, i) => <div key={i} className="bd-row"><span>{l.label}</span><span>{l.value > 0 ? `+${l.value}` : l.value}</span></div>)}
