@@ -132,9 +132,16 @@ export default function PlazaScene({ game, onNobleHover, onNobleClick, canBehead
       if (o._x < -w || o._x > W) continue;
       ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(o._x + w / 2, baseY + 2, w * 0.42, 5, 0, 0, 7); ctx.fill();
       ctx.save(); ctx.translate(o._x + w / 2 + ox, baseY - lift); ctx.rotate(rot); ctx.drawImage(c, -w / 2, -c.height); ctx.restore();
-      drawPtsBadge(ctx, o._x + w / 2 + ox, baseY - lift - c.height - 3, o.def, i === 0 && !s.exec);
+      drawPtsNum(ctx, o._x + w / 2 + ox, baseY - lift - c.height - 6, o.def, i === 0 && !s.exec);
     }
     if (showHole) drawVictimHead(ctx, geom, ex.o, ex.x, sink);
+    // the victim's number follows its head down into the hole (until the blade falls)
+    if (ex && geom && (ex.phase === 'walk' || ex.phase === 'set' || ex.phase === 'drop')) {
+      const b = bounds(ex.o), c2 = spriteCanvas(ex.o);
+      const cx = ex.phase === 'walk' ? ex.x + headCX(ex.o) : geom.HX;
+      const topY = ex.phase === 'walk' ? baseY - c2.height : victimTopY(geom, ex.o, sink) + b.top * S;
+      drawPtsNum(ctx, cx, topY - 6, ex.def, false);
+    }
     const G0 = gameRef.current.G, ready = canBeheadRef.current && G0.actionPlayed && G0.line.length > 0;
     if (s.execPull > 0) s.execPull--;
     drawExecutioner(ctx, geom, s, t, s.execHover && canBeheadRef.current, ready, labelRef.current || 'Off with their head!');
@@ -180,8 +187,9 @@ export default function PlazaScene({ game, onNobleHover, onNobleClick, canBehead
   }
   function spawnScore(s, def, x, y, pts) {
     const sign = pts < 0 ? '-' : '+', col = pts < 0 ? '#ff6a6a' : '#ffe08a';
-    s.floaters.push({ txt: sign + Math.abs(pts), x, y, vy: -0.85, life: 1.8, size: 20, col, shadow: '#280a0a' });
-    s.floaters.push({ txt: (def.name || '').toUpperCase(), x, y: y + 18, vy: -0.85, life: 1.8, size: 8, col: '#efe3cd', shadow: '#120c08', delay: 4 });
+    // the number shoots straight up (no horizontal drift) and fades
+    s.floaters.push({ txt: sign + Math.abs(pts), x, y, vy: -2.6, life: 1.9, size: 20, col, shadow: '#280a0a' });
+    s.floaters.push({ txt: (def.name || '').toUpperCase(), x, y: y + 20, vy: -2.2, life: 1.9, size: 8, col: '#efe3cd', shadow: '#120c08', delay: 5 });
   }
   function updateFloaters(ctx, s) {
     for (let i = s.floaters.length - 1; i >= 0; i--) { const f = s.floaters[i]; if (f.delay > 0) { f.delay--; continue; } f.y += f.vy; f.vy *= 0.94; f.life -= 0.009; if (f.life <= 0) { s.floaters.splice(i, 1); continue; } const a = Math.max(0, Math.min(1, f.life)); ctx.globalAlpha = a; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.font = f.size + "px 'Press Start 2P',monospace"; ctx.fillStyle = f.shadow; ctx.fillText(f.txt, f.x + 2, f.y + 2); ctx.fillStyle = f.col; ctx.fillText(f.txt, f.x, f.y); }
@@ -225,17 +233,18 @@ export default function PlazaScene({ game, onNobleHover, onNobleClick, canBehead
 
 // ── drawing helpers (module scope; take ctx) ──
 function drawTag(ctx, cx, y, txt) { ctx.font = "7px 'Press Start 2P',monospace"; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; const w = ctx.measureText(txt).width + 8; ctx.fillStyle = '#c8a24a'; ctx.fillRect(cx - w / 2, y - 10, w, 12); ctx.fillStyle = '#140d08'; ctx.fillText(txt, cx, y - 1); ctx.textAlign = 'left'; }
-// Permanent point value above each noble's head, colored by faction, for quick glancing.
-function drawPtsBadge(ctx, cx, y, def, isNext) {
-  const pts = (def.pts === null || def.pts === undefined) ? '?' : String(def.pts);
-  ctx.font = "8px 'Press Start 2P',monospace"; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-  const bw = Math.max(15, ctx.measureText(pts).width + 9), bh = 13, bx = cx - bw / 2, by = y - bh;
-  const col = COLOR_HEX[def.color] || '#8a8a8a';
-  ctx.fillStyle = '#000'; ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
-  ctx.fillStyle = col; ctx.fillRect(bx, by, bw, bh);
-  ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(bx, by, bw, 3);
-  ctx.fillStyle = '#fff'; ctx.fillText(pts, cx, by + bh - 3);
-  if (isNext) drawTag(ctx, cx, by - 5, 'NEXT');
+// Point value as the same gold/red "+N" that flies out on the behead.
+function ptsText(def) {
+  const p = (def.pts === null || def.pts === undefined) ? null : def.pts;
+  if (p === null) return { txt: '?', col: '#e8dcc6' };
+  return { txt: (p < 0 ? '-' : '+') + Math.abs(p), col: p < 0 ? '#ff8a8a' : '#ffe08a' };
+}
+function drawPtsNum(ctx, cx, y, def, isNext) {
+  const { txt, col } = ptsText(def);
+  ctx.font = "10px 'Press Start 2P',monospace"; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#280a0a'; ctx.fillText(txt, cx + 2, y + 2);
+  ctx.fillStyle = col; ctx.fillText(txt, cx, y);
+  if (isNext) drawTag(ctx, cx, y - 16, 'NEXT');
   ctx.textAlign = 'left';
 }
 function victimTopY(geom, o, sink) { const b = bounds(o), groundTop = baseY - (b.bot + 1) * S, midHead = (b.top + NECK) / 2, holeTop = geom.HY - midHead * S; return groundTop + (holeTop - groundTop) * sink; }
