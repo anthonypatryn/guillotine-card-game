@@ -12,7 +12,7 @@ import { isHeadBusy } from './animBus';
 import { judgeBlocks, callousActive, getStep, canPlayCard, playBlockReason, applyResolved } from './utils/effects';
 import { HostRoom, JoinClient, cleanCode } from './net/room';
 import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner, DealFlier, setReduce } from './Effects';
-import { playBehead, playWhoosh, playBell, playSlice, isMuted, toggleMuted } from './sound';
+import { playBehead, playWhoosh, playBell, playSlice, playHammer, isMuted, toggleMuted } from './sound';
 import { loadTheme, applyTheme, THEME_KEY, ThemeSheet } from './theme';
 import BugReport from './BugReport';
 import BugList from './BugList';
@@ -285,32 +285,45 @@ function StartScreen({ onStart, onOnline, onResume }) {
 }
 
 function GameOver({ G, onRestart, record = true }) {
-  useEffect(() => { playBell(0.7); }, []);
-  useEffect(() => {
-    if (!record) return;
-    try {
-      const rows = G.players.map((p) => ({ name: p.name, total: computeScore(p).total })).sort((a, b) => b.total - a.total);
-      const w = rows[0];
-      fetch('/api/tally', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'record', winner: w.name, score: w.total, players: G.players.length }) }).catch(() => {});
-    } catch { /* ignore */ }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const awards = accolades(G.players);
   const rows = G.players.map((p, i) => ({ name: p.name, total: computeScore(p).total, idx: i }))
     .sort((a, b) => b.total - a.total);
   const max = rows[0].total;
   const winners = rows.filter(r => r.total === max).map(r => r.name);
+  const STEP = 0.5; // seconds between each sign being hammered in
+  useEffect(() => { const t = setTimeout(() => playBell(0.7), 300); return () => clearTimeout(t); }, []);
+  // nail each sign in with a hammer blow as it lands
+  useEffect(() => {
+    const timers = rows.map((r, place) => setTimeout(() => playHammer(place === 0 ? 0.62 : 0.5), (0.5 + place * STEP + 0.36) * 1000));
+    return () => timers.forEach(clearTimeout);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!record) return;
+    try {
+      const w = rows[0];
+      fetch('/api/tally', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'record', winner: w.name, score: w.total, players: G.players.length }) }).catch(() => {});
+    } catch { /* ignore */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="screen center gameover go-wipe">
+      <div className="go-sky" aria-hidden="true" />
       <div className="noticeboard">
-        <div className="nb-title">Fin de la Révolution</div>
-        <div className="nb-winner">{winners.length > 1 ? `Tie — ${winners.join(' & ')}!` : `${winners[0]} wins!`}</div>
+        <div className="nb-head">
+          <i className="nb-fleur" aria-hidden="true" />
+          <div className="nb-titles">
+            <div className="nb-title">Fin de la Révolution</div>
+            <div className="nb-winner">{winners.length > 1 ? `Tie — ${winners.join(' & ')}!` : `${winners[0]} wins!`}</div>
+          </div>
+          <i className="nb-fleur" aria-hidden="true" />
+        </div>
         <div className="notices">
           {rows.map((r, place) => (
             <div key={r.name} className={'notice' + (r.total === max ? ' win' : '')}
-              style={{ '--rot': `${(place % 2 ? 1 : -1) * (1.4 + place * 0.5)}deg`, '--d': `${0.55 + place * 0.2}s` }}>
-              <span className="nail" />
-              <span className="notice-rank">{place === 0 ? <span className="go-crown" title="winner">★</span> : `${place + 1}`}</span>
+              style={{ '--rot': `${(place % 2 ? 1 : -1) * (1.2 + place * 0.4)}deg`, '--d': `${0.5 + place * STEP}s` }}>
+              <span className="nail nail-l" />
+              <span className="nail nail-r" />
+              <span className="notice-rank">{place === 0 ? <span className="go-crown" title="winner" /> : `${place + 1}`}</span>
               <span className="notice-name">{r.name}</span>
               <span className="notice-score"><HeadScore value={r.total} /></span>
               <span className="notice-awards">

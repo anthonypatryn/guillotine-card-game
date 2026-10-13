@@ -98,6 +98,22 @@ export function playBloodDrops() { // wet droplet plips
   if (muted) return; try { const ctx = actx(); if (!ctx) return; if (ctx.state === 'suspended') ctx.resume(); const n = 5 + Math.floor(Math.random() * 4);
     for (let i = 0; i < n; i++) { const t = ctx.currentTime + 0.04 + i * (0.05 + Math.random() * 0.12); const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; const f0 = 280 + Math.random() * 520; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f0 * 0.4, t + 0.07); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.1 + Math.random() * 0.05, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09); o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.1); }
   } catch { /* ignore */ } }
+// Hammer: a sharp wood crack + low thunk — used to nail each end-game sign in.
+export function playHammer(vol = 0.5) {
+  if (muted) return;
+  try {
+    const ctx = actx(); if (!ctx) return; if (ctx.state === 'suspended') ctx.resume();
+    const t = ctx.currentTime;
+    const s = ctx.createBufferSource(); s.buffer = nbuf(ctx, 0.05);
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1700; bp.Q.value = 0.8;
+    const ng = ctx.createGain(); ng.gain.setValueAtTime(vol * 0.85, t); ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    s.connect(bp).connect(ng).connect(ctx.destination); s.start(t); s.stop(t + 0.05);
+    const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine';
+    o.frequency.setValueAtTime(190, t); o.frequency.exponentialRampToValueAtTime(58, t + 0.09);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.13);
+  } catch { /* ignore */ }
+}
 // 8-bit "new day" fanfare — a square-wave arpeggio sting.
 export function playDaySting(volume = 0.38) {
   if (muted) return;
