@@ -101,23 +101,47 @@ export default function App() {
   let hasLocalSave = false;
   try { const s = JSON.parse(localStorage.getItem('guillotine-save')); hasLocalSave = !!(s?.G && s.G.phase !== 'gameOver'); } catch { /* ignore */ }
 
+  // When a new day begins, PAUSE play (no next turn / no resume) until the final
+  // head of the day has landed AND the transition has played:
+  //   last head cut → bounce → end day → transition → new nobles walk in → resume.
+  // Depends ONLY on G.day so a phase change mid-hold never cancels the clear timer.
+  const [dayHold, setDayHold] = useState(false);
+  const prevDayHold = useRef(G.day);
+  useEffect(() => {
+    if (G.day === prevDayHold.current) return;
+    const was = prevDayHold.current; prevDayHold.current = G.day;
+    if (G.day <= was) return;                   // restart / not a forward day advance
+    setDayHold(true);
+    let done = false, t; const start = Date.now();
+    const clear = () => { if (!done) { done = true; setDayHold(false); } };
+    const afterHead = () => {
+      if (done) return;
+      if (isHeadBusy() && Date.now() - start < 6000) { t = setTimeout(afterHead, 120); return; }
+      t = setTimeout(clear, 3600);              // let the banner play
+    };
+    t = setTimeout(afterHead, 300);
+    const hard = setTimeout(clear, 12000);      // absolute safety — never freeze
+    return () => { clearTimeout(t); clearTimeout(hard); };
+  }, [G.day]);
+
   // Hotseat handoff: auto-advance for solo games / CPU seats, but pause with a
   // "pass the device" screen when it moves between two human players.
   const humanCount = G.cpu.filter((c) => !c).length;
   const needPass = !online && G.phase === 'pass' && humanCount > 1 && !G.cpu?.[G.current];
   useEffect(() => {
-    if (G.phase === 'pass' && !needPass) {
+    if (G.phase === 'pass' && !needPass && !dayHold) {
       const t = setTimeout(() => game.advanceFromPass(), 0);
       return () => clearTimeout(t);
     }
-  }, [G.phase, G.current, G.day, needPass]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [G.phase, G.current, G.day, needPass, dayHold]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Drive computer players in two beats: play a card, then (after a pause) behead.
+  // Held only during the day transition (dayHold); mid-day play is unaffected.
   useEffect(() => {
-    if (G.phase !== 'playing' || !G.cpu?.[G.current]) return;
+    if (G.phase !== 'playing' || !G.cpu?.[G.current] || dayHold) return;
     const t = setTimeout(() => { if (G.actionPlayed) game.collectAndEnd(); else game.cpuPlay(); }, Math.round(1900 / speed));
     return () => clearTimeout(t);
-  }, [G.phase, G.current, G.day, G.actionPlayed, speed]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [G.phase, G.current, G.day, G.actionPlayed, speed, dayHold]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hold the game-over screen until the final severed head has landed (bounced
   // on the ground + flown to the pile), then a short cinematic beat.
