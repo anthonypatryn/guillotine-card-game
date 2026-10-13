@@ -435,6 +435,25 @@ function HeadPile({ nobles }) {
   );
 }
 
+// Quick-glance color squares: how many heads of each faction a player holds.
+const FACTION_ORDER = ['red', 'blue', 'green', 'purple', 'gray'];
+function FactionChips({ nobles }) {
+  const by = {};
+  nobles.forEach(n => { by[n.color] = (by[n.color] || 0) + 1; });
+  const entries = FACTION_ORDER.filter(c => by[c]);
+  if (!entries.length) return <div className="fc-row empty">No heads yet</div>;
+  return (
+    <div className="fc-row">
+      {entries.map(c => (
+        <span key={c} className="fc-chip" title={`${by[c]} ${COLORS[c] || c} head${by[c] > 1 ? 's' : ''}`}>
+          <i className="fc-sw" style={{ background: COLOR_HEX[c] }} />
+          <b className="fc-ct">{by[c]}</b>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // Cards in hand, drawn as a little jaunty stack of cards with the count.
 function HandStack({ count }) {
   return (
@@ -809,15 +828,16 @@ function PlayerCard({ player, index, game, step, onInspect, onExpand, isLeader }
     <div className={'pcard' + (isCurrent ? ' active' : '') + (playerTarget ? ' selectable' : '') + (isLeader ? ' leader' : '')}
       data-pile={index}
       onClick={() => (playerTarget ? game.pick({ playerIdx: index }) : onExpand(index))}>
+      <div className="pc-name-row">
+        {isLeader && <CrownIcon className="pc-crown" />}
+        <span className="pc-name-full">{player.name}</span>
+        {G.cpu?.[index] && <span className="cpu-badge">CPU</span>}
+      </div>
       <div className="pc-top">
-        <span className="pc-name">
-          {isLeader && <CrownIcon className="pc-crown" />}
-          <span className="pc-name-txt">{player.name}</span>{G.cpu?.[index] && <span className="cpu-badge">CPU</span>}
-        </span>
         <HandStack count={player.hand.length} />
         <span className="pc-score" title={`Score breakdown:\n${breakdown}`}><ScoreDelta value={total} /><HeadScore value={total} gold /></span>
       </div>
-      <HeadPile nobles={player.scorePile} />
+      <FactionChips nobles={player.scorePile.map(i => NOBLE_BY_ID[i.defId])} />
       {player.frontCards.length > 0 && (
         <div className="pc-fronts">
           {player.frontCards.map(inst => {
