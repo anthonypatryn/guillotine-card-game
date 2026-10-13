@@ -197,6 +197,8 @@ function RotateHint() {
 
 // Computer players fight under Resistance code-names; each has a nerve level.
 const RESISTANCE_NAMES = ['Le Renard', 'La Chouette', 'Papillon', 'Le Fantôme', 'Minuit', 'Le Corbeau', 'Lazare', 'Colette'];
+// Per-seat player colors (8-bit roster chips)
+const PLAYER_HUES = ['#e8c35a', '#4e78b0', '#4e8a56', '#c0392b', '#9e86c0'];
 const DIFFS = [
   { key: 0, label: 'Recrue',    hint: 'Easy — hesitates and improvises' },
   { key: 1, label: 'Résistant', hint: 'Medium — plays the best obvious move' },
@@ -241,6 +243,10 @@ function StartScreen({ onStart, onOnline, onResume }) {
       <div className="seat-list">
         {seats.map((s, i) => (
           <div key={i} className={'seat-row' + (s.human ? ' is-human' : ' is-cpu')}>
+            <span className="seat-av" style={{ '--seat-c': PLAYER_HUES[i % PLAYER_HUES.length] }} aria-hidden="true">
+              <span className="seat-av-face" />
+              <span className="seat-av-num">P{i + 1}</span>
+            </span>
             <button className="seat-toggle" onClick={() => toggleHuman(i)} title="Switch Human / Computer">
               {s.human ? 'Human' : 'CPU'}
             </button>

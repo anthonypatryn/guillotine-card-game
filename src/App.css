@@ -1584,3 +1584,200 @@ button { -webkit-appearance: none; appearance: none; }
 .help-keys dd { margin: 0; color: var(--muted); }
 .help-keys kbd, .coach-list kbd { font-family: var(--font-body); font-size: 11.5px; background: var(--panel-light);
   border: 1px solid var(--muted); border-radius: 5px; padding: 0 5px; color: var(--ink); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   8-BIT PIXEL REDESIGN — main menu + player (roster) cards
+   Appended last so it wins the cascade. Hard edges, flat colors,
+   chunky bevels, no border-radius, no blur.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --px-ink: #f3e7cf;
+  --px-dim: #9a8f7a;
+  --px-panel: #1a1622;
+  --px-panel2: #241d30;
+  --px-line: #4a3f5e;
+  --px-gold: #e8c35a;
+  --px-blood: #a7303a;
+  --px-blood-lt: #c8404b;
+}
+
+/* ---- menu backdrop: dark plaza + scanlines + vignette ---- */
+.start-screen {
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,.26) 0 2px, transparent 2px 4px),
+    radial-gradient(120% 90% at 50% 0%, #241d30 0%, #140f1c 55%, #0c0912 100%);
+  image-rendering: pixelated;
+  padding: 26px 16px 40px;
+}
+.start-fleurs::before {
+  opacity: .08 !important;
+  background: repeating-conic-gradient(var(--px-gold) 0 25%, transparent 0 50%) 0 0/22px 22px !important;
+}
+
+/* ---- hero logo ---- */
+.start-logo { width: min(92vw, 520px) !important; filter: drop-shadow(0 4px 0 rgba(0,0,0,.6)); }
+.start-screen .pixlogo-word {
+  text-shadow: 3px 3px 0 #000, 0 0 10px rgba(232,195,90,.35);
+  letter-spacing: 2px;
+}
+
+/* ---- tagline + notes use the VT323 flavor font ---- */
+.start-screen .muted {
+  font-family: var(--font-flavor) !important;
+  font-size: 22px !important;
+  line-height: 1.1;
+  letter-spacing: .5px;
+  color: #cdbf9e !important;
+}
+.start-screen .resist-note { font-size: 19px !important; font-style: normal !important; color: var(--px-dim) !important; }
+
+/* ---- generic pixel button (chunky bevel, hard edges) ---- */
+.start-screen .btn,
+.start-screen .count-btn,
+.start-screen .seat-toggle,
+.start-screen .diff-btn {
+  border-radius: 0 !important;
+  font-family: var(--font-display) !important;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  image-rendering: pixelated;
+  transition: none !important;
+}
+.start-screen .btn {
+  background: var(--px-panel2) !important;
+  color: var(--px-ink) !important;
+  border: 3px solid #000 !important;
+  box-shadow: 0 5px 0 #000, inset -3px -3px 0 rgba(0,0,0,.45), inset 3px 3px 0 rgba(255,255,255,.08);
+  padding: 13px 24px !important;
+  font-size: 13px !important;
+}
+.start-screen .btn:hover { filter: brightness(1.15); }
+.start-screen .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #000, inset -3px -3px 0 rgba(0,0,0,.45); }
+.start-screen .btn.primary {
+  background: var(--px-blood) !important;
+  box-shadow: 0 5px 0 #4a0f16, inset -3px -3px 0 rgba(0,0,0,.4), inset 3px 3px 0 rgba(255,255,255,.14);
+}
+.start-screen .btn.primary:hover { background: var(--px-blood-lt) !important; }
+.start-screen .btn.primary:active { box-shadow: 0 1px 0 #4a0f16, inset -3px -3px 0 rgba(0,0,0,.4); }
+.start-screen .resume-btn { font-size: 11px !important; padding: 10px 18px !important; }
+
+/* ---- player count picker ---- */
+.count-pick { gap: 10px; margin: 14px 0 16px; }
+.cp-label { font-family: var(--font-display) !important; font-size: 10px !important; color: var(--px-gold) !important; letter-spacing: 1px; }
+.start-screen .count-btn {
+  width: 40px; height: 40px; padding: 0 !important;
+  background: var(--px-panel2) !important; color: var(--px-ink) !important;
+  border: 3px solid #000 !important; font-size: 12px !important;
+  box-shadow: 0 4px 0 #000, inset 2px 2px 0 rgba(255,255,255,.07);
+}
+.start-screen .count-btn:hover { filter: brightness(1.2); }
+.start-screen .count-btn.on {
+  background: var(--px-gold) !important; color: #2a1d14 !important;
+  box-shadow: 0 4px 0 #6e4a12, inset 2px 2px 0 rgba(255,255,255,.3);
+}
+
+/* ---- seat / roster cards ---- */
+.seat-list { gap: 10px; width: min(94vw, 580px); }
+.seat-row {
+  display: flex; align-items: center; gap: 10px;
+  background: linear-gradient(180deg, var(--px-panel2), var(--px-panel)) !important;
+  border: 3px solid #000 !important; border-left-width: 3px !important;
+  border-radius: 0 !important;
+  padding: 10px 12px !important;
+  box-shadow: 0 4px 0 #000, inset 0 0 0 2px rgba(255,255,255,.04);
+  position: relative;
+}
+.seat-row.is-human { box-shadow: 0 4px 0 #000, inset 4px 0 0 var(--px-gold); }
+.seat-row.is-cpu   { box-shadow: 0 4px 0 #000, inset 4px 0 0 var(--px-blood); }
+
+/* pixel roster avatar — color token with a tiny silhouette + P# */
+.seat-av {
+  flex: 0 0 auto; position: relative;
+  width: 38px; height: 42px;
+  background: var(--seat-c);
+  border: 3px solid #000;
+  box-shadow: inset -3px -3px 0 rgba(0,0,0,.35), inset 3px 3px 0 rgba(255,255,255,.25);
+  display: flex; align-items: flex-end; justify-content: center;
+  image-rendering: pixelated;
+}
+.seat-av-face {
+  position: absolute; left: 50%; top: 7px; transform: translateX(-50%);
+  width: 16px; height: 16px; background: rgba(0,0,0,.55);
+  box-shadow: 0 13px 0 -2px rgba(0,0,0,.55);
+}
+.seat-av-num {
+  position: relative; z-index: 1;
+  font-family: var(--font-display); font-size: 7px; color: #fff;
+  text-shadow: 1px 1px 0 #000; padding-bottom: 3px;
+}
+
+.start-screen .seat-toggle {
+  flex: 0 0 auto; min-width: 62px;
+  background: #0e0b14 !important; color: var(--px-ink) !important;
+  border: 3px solid #000 !important; padding: 8px 8px !important; font-size: 9px !important;
+  box-shadow: inset 2px 2px 0 rgba(255,255,255,.06);
+}
+.seat-row.is-human .seat-toggle { color: var(--px-gold) !important; }
+.seat-row.is-cpu   .seat-toggle { color: var(--px-blood-lt) !important; }
+.start-screen .seat-toggle:hover { filter: brightness(1.3); }
+
+.seat-name {
+  flex: 1 1 auto; min-width: 0;
+  background: #0b0910 !important; color: var(--px-ink) !important;
+  border: 3px solid #000 !important; border-radius: 0 !important;
+  font-family: var(--font-flavor) !important; font-size: 21px !important;
+  padding: 4px 10px !important; letter-spacing: .5px;
+  box-shadow: inset 2px 2px 0 rgba(0,0,0,.5);
+  outline: none;
+}
+.seat-name:focus { border-color: var(--px-gold) !important; }
+
+.seat-diffs { gap: 5px; flex: 0 0 auto; }
+.start-screen .diff-btn {
+  background: #0e0b14 !important; color: var(--px-dim) !important;
+  border: 3px solid #000 !important; padding: 7px 8px !important; font-size: 8px !important;
+}
+.start-screen .diff-btn:hover { filter: brightness(1.4); color: var(--px-ink) !important; }
+.start-screen .diff-btn.on {
+  background: var(--px-blood) !important; color: #fff !important;
+  box-shadow: inset 2px 2px 0 rgba(255,255,255,.18);
+}
+
+/* ---- start buttons + links ---- */
+.start-buttons { gap: 14px; margin-top: 6px; }
+.start-links { margin-top: 14px; gap: 22px; }
+.start-screen .hof-link {
+  font-family: var(--font-display) !important; font-size: 9px !important;
+  color: var(--px-gold) !important; letter-spacing: .5px;
+  border-bottom: 2px solid transparent; padding-bottom: 2px;
+}
+.start-screen .hof-link:hover { text-decoration: none; border-bottom-color: var(--px-gold); }
+
+/* ═══ IN-GAME player (HUD) cards — matching 8-bit frame ═══ */
+.pcard {
+  border-radius: 0 !important;
+  background: linear-gradient(180deg, var(--px-panel2), var(--px-panel)) !important;
+  border: 3px solid #000 !important;
+  box-shadow: 0 4px 0 #000, inset 0 0 0 2px rgba(255,255,255,.04) !important;
+}
+.pcard.active {
+  box-shadow: 0 4px 0 #000, inset 0 0 0 2px var(--px-gold), 0 0 14px rgba(232,195,90,.45) !important;
+}
+.pcard.selectable {
+  box-shadow: 0 4px 0 #000, inset 0 0 0 2px var(--px-blood-lt), 0 0 14px rgba(231,76,60,.5) !important;
+  animation: pulse 1s infinite;
+}
+.pcard.leader { box-shadow: 0 4px 0 #000, inset 0 0 0 2px color-mix(in srgb, var(--px-gold) 70%, transparent) !important; }
+.cpu-badge {
+  background: var(--px-blood) !important; color: #fff !important;
+  border: 2px solid #000 !important; border-radius: 0 !important;
+  padding: 1px 4px !important; text-shadow: 1px 1px 0 #000;
+}
+
+/* mobile: keep bevels tight */
+@media (max-width: 640px) {
+  .start-screen .muted { font-size: 19px !important; }
+  .seat-name { font-size: 18px !important; }
+  .start-screen .btn { font-size: 11px !important; }
+}
