@@ -6,6 +6,8 @@ import {
   nobleImg, actionImg, NOBLE_BACK, ACTION_BACK,
 } from './data/cards';
 import { computeScore } from './utils/scoring';
+import { SCENE_SPRITES, SPRITE_ALPHA, NOBLE_SPRITES, spriteSlug } from './data/sprites';
+import PlazaScene from './PlazaScene';
 import { judgeBlocks, callousActive, getStep, canPlayCard, playBlockReason, applyResolved } from './utils/effects';
 import { HostRoom, JoinClient, cleanCode } from './net/room';
 import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner, DealFlier, setReduce } from './Effects';
@@ -15,12 +17,18 @@ import BugReport from './BugReport';
 import BugList from './BugList';
 
 
-// The brand logo with a one-time light sweep (reflection) across its shape.
+// Pixel brand logo: the forged guillotine emblem + the wordmark in pixel type.
 function ShineLogo({ className }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const c = ref.current, spr = SCENE_SPRITES.logo; if (!c || !spr) return;
+    c.width = spr.w; c.height = spr.h; const cc = c.getContext('2d'); cc.imageSmoothingEnabled = false;
+    for (let y = 0; y < spr.h; y++) for (let x = 0; x < spr.w; x++) { const i = SPRITE_ALPHA.indexOf(spr.px[y * spr.w + x]); if (i > 0) { cc.fillStyle = spr.pal[i]; cc.fillRect(x, y, 1, 1); } }
+  }, []);
   return (
-    <span className={'shine-logo ' + (className || '')}>
-      <img className={className} src="/logo-title.png" alt="Guillotine" />
-      <span className="shine-gleam" style={{ WebkitMaskImage: 'url(/logo-title.png)', maskImage: 'url(/logo-title.png)' }} aria-hidden="true" />
+    <span className={'shine-logo pixlogo ' + (className || '')}>
+      <canvas ref={ref} className="pixlogo-emblem" aria-hidden="true" />
+      <span className="pixlogo-word">GUILLOTINE</span>
     </span>
   );
 }
@@ -287,7 +295,7 @@ function GameOver({ G, onRestart, record = true }) {
             <div key={r.name} className={'notice' + (r.total === max ? ' win' : '')}
               style={{ '--rot': `${(place % 2 ? 1 : -1) * (1.4 + place * 0.5)}deg`, '--d': `${0.55 + place * 0.2}s` }}>
               <span className="nail" />
-              <span className="notice-rank">{place === 0 ? <img className="go-crown" src="/art/fleur.svg" alt="winner" /> : `${place + 1}`}</span>
+              <span className="notice-rank">{place === 0 ? <span className="go-crown" title="winner">★</span> : `${place + 1}`}</span>
               <span className="notice-name">{r.name}</span>
               <span className="notice-score"><HeadScore value={r.total} /></span>
               <span className="notice-awards">
@@ -329,8 +337,30 @@ function previewResultLine(G, def, picks = []) {
   return { line: patch.line, movedUid };
 }
 
-const nobleInspect = (def, el, gain) => ({ img: nobleImg(def.id), name: def.name, faction: def.color, factionName: FACTION[def.color].title, text: def.text, color: COLOR_HEX[def.color], gain, rect: el?.getBoundingClientRect() });
-const actionInspect = (def, el) => ({ img: actionImg(def.id), name: def.name, text: def.text, color: '#b4323d', rect: el?.getBoundingClientRect() });
+// Which nobles in line relate to the one you're hovering (set-scorers, pairs, dupes).
+function relatedNobleUids(def, line) {
+  if (!line) return null;
+  const uids = new Set();
+  const add = (pred) => line.forEach(i => { const d = NOBLE_BY_ID[i.defId]; if (d && pred(d)) uids.add(i.uid); });
+  if (def.name === 'Count') add(d => d.name === 'Countess');
+  else if (def.name === 'Countess') add(d => d.name === 'Count');
+  if (def.special === 'palaceGuard') add(d => d.special === 'palaceGuard');
+  if (def.color === 'gray') add(d => d.color === 'gray');            // Tragic Figure & the Gray set
+  add(d => d.name === def.name);                                      // duplicates of the same noble
+  return uids.size ? uids : null;
+}
+// Which nobles an action card would touch (by faction / special / named target).
+function relatedActionUids(def, line) {
+  if (!line) return null;
+  const p = def.params || {}; const uids = new Set();
+  const add = (pred) => line.forEach(i => { const d = NOBLE_BY_ID[i.defId]; if (d && pred(d)) uids.add(i.uid); });
+  if (p.color) add(d => d.color === p.color);
+  if (p.special) add(d => d.special === p.special);
+  if (p.nobleId) add(d => d.id === p.nobleId);
+  return uids.size ? uids : null;
+}
+const nobleInspect = (def, el, gain, line) => ({ img: nobleImg(def.id), name: def.name, faction: def.color, factionName: FACTION[def.color].title, text: def.text, color: COLOR_HEX[def.color], gain, rect: el?.getBoundingClientRect(), affected: relatedNobleUids(def, line) });
+const actionInspect = (def, el, line) => ({ img: actionImg(def.id), name: def.name, text: def.text, color: '#b4323d', rect: el?.getBoundingClientRect(), affected: relatedActionUids(def, line) });
 
 // What a noble would be worth to `player` if collected right now — the true
 // marginal points (combos included, via computeScore) plus a plain-language note
@@ -382,14 +412,28 @@ const SpeakerIcon = ({ muted, ...p }) => <Ico {...p} d={muted
   : <><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none" /><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" /></>} />;
 const BugIcon = (p) => <Ico {...p} d={<><rect x="8" y="7" width="8" height="12" rx="4" /><path d="M12 7V4M9 5l2 2M15 5l-2 2M8 10H4M8 14H3.5M8 18l-3 2M16 10h4M16 14h4.5M16 18l3 2" /></>} />;
 
-// A faction's collected heads shown in its tribe-colored basket (real art) with
-// the running count of heads caught in it.
-function BasketPip({ colorKey, count, title }) {
+// A collected noble rendered as just its severed PIXEL head (top rows of the sprite).
+const _headCache = {};
+function headImg(def) {
+  const k = spriteSlug(def.name); if (_headCache[k] !== undefined) return _headCache[k];
+  const spr = NOBLE_SPRITES[k]; if (!spr) return (_headCache[k] = null);
+  let L = 99, R = -1, T = 99, B = -1;
+  for (let y = 0; y < 12; y++) for (let x = 0; x < spr.w; x++) if (SPRITE_ALPHA.indexOf(spr.px[y * spr.w + x]) > 0) { if (x < L) L = x; if (x > R) R = x; if (y < T) T = y; if (y > B) B = y; }
+  if (R < 0) return (_headCache[k] = null);
+  const sc = 4, w = R - L + 1, h = B - T + 1, c = document.createElement('canvas');
+  c.width = w * sc; c.height = h * sc; const cc = c.getContext('2d'); cc.imageSmoothingEnabled = false;
+  for (let y = T; y <= B; y++) for (let x = L; x <= R; x++) { const i = SPRITE_ALPHA.indexOf(spr.px[y * spr.w + x]); if (i > 0) { cc.fillStyle = spr.pal[i]; cc.fillRect((x - L) * sc, (y - T) * sc, sc, sc); } }
+  return (_headCache[k] = c.toDataURL('image/png'));
+}
+// Each player's collected heads as a little pile of pixel heads.
+function HeadPile({ nobles }) {
+  if (!nobles.length) return <div className="head-pile empty">No heads yet</div>;
+  const show = nobles.slice(-9);
   return (
-    <span className={'bpip' + (count ? '' : ' empty')} title={`${title}: ${count} head${count === 1 ? '' : 's'}`}>
-      <img className="bpip-img" src={`/art/basket-${colorKey}.svg`} alt="" />
-      {count > 0 && <span className="bpip-ct">{count}</span>}
-    </span>
+    <div className="head-pile" title={`${nobles.length} head${nobles.length === 1 ? '' : 's'}`}>
+      {show.map((inst) => { const src = headImg(NOBLE_BY_ID[inst.defId]); return src ? <img key={inst.uid} className="hp-head" src={src} alt="" /> : null; })}
+      {nobles.length > show.length && <span className="hp-more">+{nobles.length - show.length}</span>}
+    </div>
   );
 }
 
@@ -434,11 +478,10 @@ function accolades(players) {
   return per;
 }
 
-// Total points shown over the severed-head silhouette (real art).
+// Total points as a pixel chip.
 function HeadScore({ value, gold }) {
   return (
     <span className={'headscore' + (gold ? ' gold' : '')} title={`${value} points`}>
-      <img className="hs-img" src={gold ? '/art/head-gold.svg' : '/art/head.svg'} alt="" />
       <span className="hs-num">{value}</span>
     </span>
   );
@@ -504,7 +547,6 @@ function Board({ game }) {
     const fresh = G.log.filter(l => l.id > seen.current);
     if (!fresh.length) return;
     seen.current = Math.max(seen.current, ...fresh.map(l => l.id));
-    const nf = [], ns = [];
     let lastPlay = null;
     const myHeads = [];           // nobles the VIEWER collected this batch → confirmation toast
     let lastCollectKey = 0;
@@ -516,22 +558,10 @@ function Board({ game }) {
         continue;
       }
       if (e.kind !== 'collect') continue;
-      playBehead();
-      setDropTick(t => t + 1);
-      // Confirm a collect the local player made. In hotseat the turn has already
-      // advanced, so match any human seat; online, match only this client's seat.
+      // The behead animation (blade, blood, bouncing head → pile) is owned by PlazaScene.
       const mine = game.seat != null ? e.playerIdx === game.seat : !G.cpu?.[e.playerIdx];
       if (mine && e.defId) { myHeads.push(NOBLE_BY_ID[e.defId].name); lastCollectKey = e.id; }
-      const from = lineRects.current[String(e.uid)];
-      const pile = document.querySelector(`[data-pile="${e.playerIdx}"]`);
-      if (!from || !pile) continue;
-      const p = pile.getBoundingClientRect();
-      const fromPt = { x: from.left + from.width / 2, y: from.top + from.height / 2 };
-      nf.push({ key: e.id, uid: e.uid, defId: e.defId, from: fromPt, to: { x: p.left + p.width / 2, y: p.top + p.height / 2 } });
-      ns.push({ key: e.id, x: fromPt.x + (Math.random() * 120 - 60), y: fromPt.y + (Math.random() * 90 - 30), scale: 0.85 + Math.random() * 0.7 });
     }
-    if (nf.length) setFliers(f => [...f, ...nf]);
-    if (ns.length) setSplats(s => [...s, ...ns]);
     // Plays take visual priority; otherwise confirm the viewer's own collect.
     if (lastPlay) setCallout(lastPlay);
     else if (myHeads.length) setCallout({ key: lastCollectKey, verb: 'collected', who: 'You', name: myHeads.join(' + ') });
@@ -642,6 +672,14 @@ function Board({ game }) {
   const pileStep = step && step.type === 'pileNoble' ? step.playerIdx : null;
   const showPile = expanded != null ? expanded : pileStep;
 
+  // Plaza scene wiring (replaces the card-token line)
+  const vScene = G.players[viewerIdx];
+  const plazaHover = (def, rect) => onInspect(def ? nobleInspect(def, { getBoundingClientRect: () => rect }, nobleGain(vScene, def), G.line) : null);
+  const plazaClick = (i) => { if (step && (step.type === 'lineNoble' || step.type === 'reorder') && step.candidates?.includes(i)) game.pick({ idx: i }); else setNobleOpen(i); };
+  const activeIsMe = game.seat == null || G.current === game.seat;
+  const canBehead = G.phase === 'playing' && !targeting && !G.cpu?.[G.current] && activeIsMe;
+  const beheadCta = G.line.length === 0 ? 'End turn' : 'Off with their head!';
+
   return (
     <div className="board2">
       <main className="field">
@@ -657,7 +695,16 @@ function Board({ game }) {
         </div>
         {locks.length > 0 && <div className="locks">{locks.map((l, i) => <span key={i} className="lock-chip">{l}</span>)}</div>}
 
-        <GuillotineLine game={game} step={step} onPick={game.pick} onInspect={onInspect} targeting={targeting} drop={dropTick} hint={hintUids} preview={linePreview} onPreview={setLinePreview} onOpenNoble={setNobleOpen} />
+        <div className="plaza-wrap">
+          <PlazaScene game={game} onNobleHover={plazaHover} onNobleClick={plazaClick} />
+          <div className="plaza-controls">
+            <button className={'guillo-btn' + (canBehead ? ' live pulse' : '')}
+              onClick={canBehead ? game.collectAndEnd : undefined} disabled={!canBehead}
+              title={canBehead ? `${beheadCta} (Space)` : 'Wait for your turn'}>{beheadCta}</button>
+            {targeting && <button className="btn small" onClick={game.cancelTarget} title="Cancel (Esc)">Cancel</button>}
+            {game.canUndo() && <button className="btn small" onClick={game.undo} title="Undo (U)">↶ Undo</button>}
+          </div>
+        </div>
 
         <HandDock game={game} seat={handSeat} canPlay={handPlayable} onOpen={setCardOpen} />
       </main>
@@ -760,9 +807,6 @@ function PlayerCard({ player, index, game, step, onInspect, onExpand, isLeader }
   const playerTarget = step && step.type === 'player' && step.candidates.includes(index);
   const frontTarget = step && step.type === 'frontCard';
 
-  const tally = {};
-  player.scorePile.forEach(inst => { const c = NOBLE_BY_ID[inst.defId].color; tally[c] = (tally[c] || 0) + 1; });
-
   return (
     <div className={'pcard' + (isCurrent ? ' active' : '') + (playerTarget ? ' selectable' : '') + (isLeader ? ' leader' : '')}
       data-pile={index}
@@ -775,9 +819,7 @@ function PlayerCard({ player, index, game, step, onInspect, onExpand, isLeader }
         <HandStack count={player.hand.length} />
         <span className="pc-score" title={`Score breakdown:\n${breakdown}`}><ScoreDelta value={total} /><HeadScore value={total} gold /></span>
       </div>
-      <div className="pc-baskets">
-        {BASKET_ORDER.map(c => <BasketPip key={c} colorKey={c} count={tally[c] || 0} title={FACTION[c].title} />)}
-      </div>
+      <HeadPile nobles={player.scorePile} />
       {player.frontCards.length > 0 && (
         <div className="pc-fronts">
           {player.frontCards.map(inst => {
@@ -788,7 +830,7 @@ function PlayerCard({ player, index, game, step, onInspect, onExpand, isLeader }
               <span key={inst.uid} className="front-wrap">
                 <img className={'pc-front' + (clickable ? ' clickable' : '')} src={actionImg(def.id)} alt={def.name}
                   title={`${def.name}\n${def.text}`}
-                  onMouseEnter={(e) => onInspect(actionInspect(def, e.currentTarget))} onMouseLeave={() => onInspect(null)}
+                  onMouseEnter={(e) => onInspect(actionInspect(def, e.currentTarget, game.G.line))} onMouseLeave={() => onInspect(null)}
                   onClick={clickable ? (e) => { e.stopPropagation(); game.pick({ playerIdx: index, cardUid: inst.uid }); } : undefined} />
                 {canDiscard && <button className="discard-x" onClick={(e) => { e.stopPropagation(); game.discardFront(inst.uid); }} title="Discard">×</button>}
               </span>
@@ -874,7 +916,7 @@ function GuillotineLine({ game, step, onPick, onInspect, targeting, drop, hint, 
               className={'noble-card token' + (idx === 0 ? ' front' : '') + (isCand && ordPos < 0 ? ' candidate' : '') + (hint?.has(inst.uid) ? ' affected' : '')}
               style={{ borderColor: COLOR_HEX[def.color] }}
               onClick={() => { if (isCand && ordPos < 0) onPick({ idx }); else onOpenNoble?.(idx); }}
-              onMouseEnter={(e) => { onInspect(nobleInspect(def, e.currentTarget, nobleGain(viewer, def)));
+              onMouseEnter={(e) => { onInspect(nobleInspect(def, e.currentTarget, nobleGain(viewer, def), G.line));
                 if (onPreview && isCand && ordPos < 0 && step?.type === 'lineNoble' && pendingDef) onPreview(previewResultLine(G, pendingDef, [{ idx }])); }}
               onMouseLeave={() => { onInspect(null); if (onPreview) onPreview(null); }}
               title={`${def.name} — ${COLORS[def.color]}`}>
@@ -923,59 +965,47 @@ function LinePreviewStrip({ preview, inline }) {
   );
 }
 
-// A detailed guillotine on a stepped platform; the blade drops on each behead.
+// Pixel guillotine (from the forge sprite); the blade drops on each behead.
+const GB_IN = (x, y) => y >= 6 && y <= 11 && x >= 6 && x <= 17;  // blade cells in the 24x32 sprite
 function Guillotine({ drop = 0 }) {
+  const ref = useRef(null);
+  const g = SCENE_SPRITES.guillotine;
+  const SG = 7, travel = 10 * SG;
+  const paint = (off) => {
+    const c = ref.current; if (!c || !g) return;
+    const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, c.width, c.height);
+    const pal = g.pal, W = g.w;
+    for (let y = 0; y < g.h; y++) for (let x = 0; x < W; x++) {
+      if (GB_IN(x, y)) continue;
+      const i = SPRITE_ALPHA.indexOf(g.px[y * W + x]);
+      if (i > 0) { ctx.fillStyle = pal[i]; ctx.fillRect(x * SG, y * SG, SG, SG); }
+    }
+    for (let y = 6; y <= 11; y++) for (let x = 6; x <= 17; x++) {
+      const i = SPRITE_ALPHA.indexOf(g.px[y * g.w + x]);
+      if (i > 0) { ctx.fillStyle = pal[i]; ctx.fillRect(x * SG, y * SG + off, SG, SG); }
+    }
+  };
+  useEffect(() => {
+    if (!g) return;
+    if (!drop) { paint(0); return; }
+    let raf, start = null; const dDur = 300, hold = 160, uDur = 300;
+    const step = (t) => {
+      if (start === null) start = t; const el = t - start; let off;
+      if (el < dDur) off = (el / dDur) * travel;
+      else if (el < dDur + hold) off = travel;
+      else { const u = Math.min(1, (el - dDur - hold) / uDur); off = travel * (1 - u); }
+      paint(off);
+      if (el < dDur + hold + uDur) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [drop]);
+  if (!g) return <div className="guillo-wrap" />;
   return (
     <div className="guillo-wrap" title="The guillotine — the next head drops here">
-      <svg className="guillo" viewBox="0 0 132 158" aria-label="guillotine">
-        <defs>
-          <linearGradient id="guilloMetal" x1="0" y1="0" x2="1" y2="0.35">
-            <stop offset="0" stopColor="#848484" /><stop offset=".3" stopColor="#dadbdc" />
-            <stop offset=".6" stopColor="#848484" /><stop offset="1" stopColor="#67696a" />
-          </linearGradient>
-          <linearGradient id="guilloEdge" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#bababa" /><stop offset=".3" stopColor="#fff" /><stop offset="1" stopColor="#929394" />
-          </linearGradient>
-          <radialGradient id="guilloRivet" cx=".35" cy=".3" r=".75">
-            <stop offset="0" stopColor="#fffcdf" /><stop offset=".3" stopColor="#d8bb12" /><stop offset="1" stopColor="#332d04" />
-          </radialGradient>
-        </defs>
-        {/* stairs leading up from the line (left) */}
-        <rect x="2" y="140" width="18" height="7" fill="#5a4330" stroke="#3f2f22" strokeWidth="0.8" />
-        <rect x="8" y="133" width="18" height="7" fill="#654b36" stroke="#3f2f22" strokeWidth="0.8" />
-        <rect x="14" y="126" width="18" height="7" fill="#6f543c" stroke="#3f2f22" strokeWidth="0.8" />
-        {/* platform (scaffold) */}
-        <polygon points="30,118 122,118 130,128 22,128" fill="#79593c" stroke="#3f2f22" strokeWidth="1" />
-        <rect x="22" y="128" width="108" height="14" fill="#5a4330" stroke="#3f2f22" strokeWidth="1" />
-        <line x1="46" y1="128" x2="46" y2="142" stroke="#43321f" strokeWidth="1" />
-        <line x1="78" y1="128" x2="78" y2="142" stroke="#43321f" strokeWidth="1" />
-        <line x1="110" y1="128" x2="110" y2="142" stroke="#43321f" strokeWidth="1" />
-        {/* uprights */}
-        <rect x="50" y="12" width="11" height="108" rx="1" fill="#44321f" stroke="#2c2015" strokeWidth="1" />
-        <rect x="88" y="12" width="11" height="108" rx="1" fill="#44321f" stroke="#2c2015" strokeWidth="1" />
-        {/* top crossbeam */}
-        <rect x="44" y="6" width="61" height="13" rx="2" fill="#4f3a26" stroke="#2c2015" strokeWidth="1" />
-        {/* lunette — the neck hole */}
-        <circle cx="74.5" cy="96" r="12" fill="#17110c" />
-        <path d="M63 96a11.5 11.5 0 0 1 23 0" fill="none" stroke="#c6a765" strokeWidth="3" />
-        <path d="M63 96a11.5 11.5 0 0 0 23 0" fill="none" stroke="#8f7236" strokeWidth="3" />
-        {/* basket for the heads */}
-        <path d="M58 112h33l-3.5 12a2 2 0 0 1-2 1.5H63.5a2 2 0 0 1-2-1.5z" fill="#8a6a3f" stroke="#5a4330" strokeWidth="1" />
-        <path d="M60 117h29M61 121h27" stroke="rgba(0,0,0,.2)" strokeWidth="0.8" />
-        {/* carriage: rope + metallic blade + wooden stock with rivets — drops on
-            behead. Drawn LAST so the dropping blade passes IN FRONT of the lunette. */}
-        <g className="guillo-blade" key={drop}>
-          <line x1="74" y1="10" x2="74" y2="28" stroke="#caa66a" strokeWidth="1.6" />
-          <polygon points="52,44 97,44 97,60 52,66" fill="url(#guilloMetal)" stroke="#5c6165" strokeWidth="0.6" />
-          <polygon points="52,60 97,55 97,60 52,66" fill="url(#guilloEdge)" opacity=".85" />
-          <rect x="47" y="28" width="54" height="17" rx="2" fill="#774c00" stroke="#3f2f22" strokeWidth="0.8" />
-          <rect x="50" y="30" width="48" height="13" rx="1.5" fill="#4c3612" />
-          <circle cx="58" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
-          <circle cx="70" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
-          <circle cx="82" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
-          <circle cx="94" cy="36.5" r="2.6" fill="url(#guilloRivet)" />
-        </g>
-      </svg>
+      <canvas ref={ref} width={g.w * SG} height={g.h * SG}
+        style={{ width: '100%', height: '100%', imageRendering: 'pixelated' }} />
     </div>
   );
 }
@@ -1156,7 +1186,7 @@ function NoblePileModal({ G, index, game, step, onInspect, forced, close }) {
             return <SlicedThumb key={inst.uid} defId={inst.defId} uid={inst.uid}
               className={'pile-card' + (clickable ? ' clickable' : '')}
               title={`${def.name} (${COLORS[def.color]})`}
-              onMouseEnter={(e) => onInspect(nobleInspect(def, e.currentTarget))} onMouseLeave={() => onInspect(null)}
+              onMouseEnter={(e) => onInspect(nobleInspect(def, e.currentTarget, null, G.line))} onMouseLeave={() => onInspect(null)}
               onClick={clickable ? () => { game.pick({ idx: pi }); close(); } : undefined} />;
           })}
         </div>
@@ -1184,7 +1214,7 @@ function HoverCard({ inspect, onKeep, onLeave, onClose }) {
         onMouseEnter={onKeep} onMouseMove={onKeep} onMouseLeave={onLeave}>
         <div className="hc-imgwrap">
           <img className="hc-img" src={img} alt={name} style={{ borderColor: color }} />
-          {faction && <img className="hc-emblem" src={`/art/symbol-${faction}.svg`} alt={factionName} title={factionName} />}
+          {faction && <span className="hc-emblem" title={factionName} style={{ display: 'inline-block', width: 12, height: 12, background: COLOR_HEX[faction], borderRadius: 2, verticalAlign: 'middle' }} />}
         </div>
         <div className="hc-name">{name}</div>
         {factionName && faction && <div className="hc-faction">{factionName}</div>}
@@ -1372,12 +1402,8 @@ function ClientShell({ client, onExit }) {
 }
 
 const TRACKS = [
-  { src: '/music/01-french-jazz.mp3', name: 'French Jazz' },
-  { src: '/music/02-paris.mp3', name: 'Paris' },
-  { src: '/music/03-france-paris.mp3', name: 'France · Paris' },
-  { src: '/music/04-french-france.mp3', name: 'Rue de Paris' },
-  { src: '/music/05-montmartre.mp3', name: 'Montmartre' },
-  { src: '/music/06-cafe-de-paris.mp3', name: 'Café de Paris' },
+  { src: '/music/one-day-more-8bit.mp3', name: 'One Day More (8-bit)' },
+  { src: '/music/do-you-hear-8bit.mp3', name: 'Do You Hear the People Sing (8-bit)' },
 ];
 
 function MusicPlayer() {

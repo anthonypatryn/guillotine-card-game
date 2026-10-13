@@ -1,3 +1,4 @@
+import { renderNoblePix, renderActionPix, backImg } from './pixel-img';
 // ─── Guillotine card data ──────────────────────────────────────────────────
 // Faithful to the 1998 Wizards of the Coast game.
 // Full deck = 50 Noble cards + 60 Action cards. `qty` = copies in the deck.
@@ -129,10 +130,10 @@ export const ACTIONS = [
 export const NOBLE_BY_ID  = Object.fromEntries(NOBLES.map(n => [n.id, n]));
 export const ACTION_BY_ID = Object.fromEntries(ACTIONS.map(a => [a.id, a]));
 
-export function nobleImg(id)  { return `/cards/nobles/${id}.jpeg`; }
-export function actionImg(id) { return `/cards/actions/${id}.jpeg`; }
-export const NOBLE_BACK  = '/cards/nobles/back.webp';
-export const ACTION_BACK = '/cards/actions/back.png';
+export function nobleImg(id)  { const n = NOBLE_BY_ID[id];  return (n && renderNoblePix(n.name, COLOR_HEX[n.color])) || `/cards/nobles/${id}.jpeg`; }
+export function actionImg(id) { const a = ACTION_BY_ID[id]; return (a && renderActionPix(a.name)) || `/cards/actions/${id}.jpeg`; }
+export const NOBLE_BACK  = backImg(false);
+export const ACTION_BACK = backImg(true);
 
 export function shuffle(arr) {
   const a = [...arr];

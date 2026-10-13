@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
 import { NOBLE_BY_ID, COLOR_HEX, nobleImg } from './data/cards';
-import { playRooster } from './sound';
+import { playRooster, playDaySting } from './sound';
 
 let _reduce = typeof matchMedia !== 'undefined'
   && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -213,15 +213,14 @@ export function DealFlier({ deal, onDone }) {
 // A clock wipe to a solid panel showing the day (rooster crows at dawn), then
 // the clock wipes back to reveal the board.
 export function DayBanner({ day }) {
-  useEffect(() => { if (!_reduce) playRooster(); }, [day]);
+  useEffect(() => { if (!_reduce) { playRooster(); playDaySting(); } }, [day]);
   return (
     <div className="day-clock" key={day} data-day={day} aria-hidden="true">
       <div className="dc-fleurs" />
+      <div className="dc-scan" />
       <div className="dc-face">
-        <img className="dc-fleur" src="/art/fleur.svg" alt="" />
-        <span className="dc-day">Day {day}</span>
-        <span className="dc-sub">of 3</span>
-        <img className="dc-fleur" src="/art/fleur.svg" alt="" />
+        <span className="dc-day">DAY {day}</span>
+        <span className="dc-sub">&mdash; OF 3 &mdash;</span>
       </div>
     </div>
   );
