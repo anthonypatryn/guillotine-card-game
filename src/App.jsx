@@ -19,18 +19,8 @@ import BugList from './BugList';
 
 // Pixel brand logo: the forged guillotine emblem + the wordmark in pixel type.
 function ShineLogo({ className }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    const c = ref.current, spr = SCENE_SPRITES.logo; if (!c || !spr) return;
-    c.width = spr.w; c.height = spr.h; const cc = c.getContext('2d'); cc.imageSmoothingEnabled = false;
-    for (let y = 0; y < spr.h; y++) for (let x = 0; x < spr.w; x++) { const i = SPRITE_ALPHA.indexOf(spr.px[y * spr.w + x]); if (i > 0) { cc.fillStyle = spr.pal[i]; cc.fillRect(x, y, 1, 1); } }
-  }, []);
-  return (
-    <span className={'shine-logo pixlogo ' + (className || '')}>
-      <canvas ref={ref} className="pixlogo-emblem" aria-hidden="true" />
-      <span className="pixlogo-word">GUILLOTINE</span>
-    </span>
-  );
+  // Pixel-art wordmark (guillotine built into the letters).
+  return <img src="/logo-guillotine.svg" alt="Guillotine" className={'pixlogo-img ' + (className || '')} />;
 }
 
 export default function App() {

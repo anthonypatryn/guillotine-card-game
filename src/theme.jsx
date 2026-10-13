@@ -28,35 +28,22 @@ const PALETTES = {
     '--bg': '#efe7d8', '--panel': '#e2d6c1', '--panel-light': '#d0c0a2', '--ink': '#3b342a', '--muted': '#7a6e5b',
     '--accent': '#b06a4a', '--accent-bright': '#c47a55', '--gold': '#d8a23c', '--cream': '#f4ecdd' } },
 };
+// Pixel fonts only — the two the game ships with.
 const HEAD_FONTS = {
-  carter:    { name: 'Carter One',  css: "'Carter One', Georgia, serif" },
-  fraunces:  { name: 'Fraunces',    css: "'Fraunces', Georgia, serif" },
-  playfair:  { name: 'Playfair',    css: "'Playfair Display', Georgia, serif" },
-  bodoni:    { name: 'Bodoni',      css: "'Bodoni Moda', Georgia, serif" },
-  cormorant: { name: 'Cormorant',   css: "'Cormorant Garamond', Georgia, serif" },
-  marcellus: { name: 'Marcellus',   css: "'Marcellus', Georgia, serif" },
-  cinzel:    { name: 'Cinzel',      css: "'Cinzel', Georgia, serif" },
-  abril:     { name: 'Abril',       css: "'Abril Fatface', Georgia, serif" },
-  yeseva:    { name: 'Yeseva',      css: "'Yeseva One', Georgia, serif" },
-  rye:       { name: 'Rye',         css: "'Rye', serif" },
+  press: { name: 'Press Start', css: "'Press Start 2P', monospace" },
+  silk:  { name: 'Silkscreen',  css: "'Silkscreen', monospace" },
 };
 const BODY_FONTS = {
-  merriweather: { name: 'Merriweather',     css: "'Merriweather', Georgia, serif" },
-  shantell:  { name: 'Shantell (handmade)', css: "'Shantell Sans', system-ui, sans-serif" },
-  jost:      { name: 'Jost',                css: "'Jost', system-ui, sans-serif" },
-  garamond:  { name: 'EB Garamond',         css: "'EB Garamond', Georgia, serif" },
-  cormorant: { name: 'Cormorant',           css: "'Cormorant Garamond', Georgia, serif" },
+  silk:  { name: 'Silkscreen',  css: "'Silkscreen', monospace" },
+  press: { name: 'Press Start', css: "'Press Start 2P', monospace" },
 };
 export const THEME_KEY = 'guillotine-theme';
 export function loadTheme() {
   try {
     const t = JSON.parse(localStorage.getItem(THEME_KEY));
-    if (t && PALETTES[t.palette] && HEAD_FONTS[t.head] && BODY_FONTS[t.body]) {
-      if (t.head === 'fraunces' && t.body === 'shantell') { t.head = 'carter'; t.body = 'merriweather'; } // migrate old defaults
-      return t;
-    }
+    if (t && PALETTES[t.palette] && HEAD_FONTS[t.head] && BODY_FONTS[t.body]) return t;
   } catch { /* ignore */ }
-  return { palette: 'parisian-noir', head: 'carter', body: 'merriweather' };
+  return { palette: 'parisian-noir', head: 'press', body: 'silk' };
 }
 export function applyTheme({ palette, head, body }) {
   const root = document.documentElement;
