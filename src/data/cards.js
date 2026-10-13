@@ -131,7 +131,7 @@ export const NOBLE_BY_ID  = Object.fromEntries(NOBLES.map(n => [n.id, n]));
 export const ACTION_BY_ID = Object.fromEntries(ACTIONS.map(a => [a.id, a]));
 
 export function nobleImg(id)  { const n = NOBLE_BY_ID[id];  return (n && renderNoblePix(n.name, COLOR_HEX[n.color])) || `/cards/nobles/${id}.jpeg`; }
-export function actionImg(id) { const a = ACTION_BY_ID[id]; return (a && renderActionPix(a.name)) || `/cards/actions/${id}.jpeg`; }
+export function actionImg(id) { const a = ACTION_BY_ID[id]; return (a && renderActionPix(a)) || `/cards/actions/${id}.jpeg`; }
 export const NOBLE_BACK  = backImg(false);
 export const ACTION_BACK = backImg(true);
 

@@ -57,11 +57,108 @@ export function renderNoblePix(name, hex) {
   const spr = NOBLE_SPRITES[slug];
   return (cache[k] = spr ? render(spr, false, hex) : null);
 }
-export function renderActionPix(name) {
-  const slug = spriteSlug(name), k = 'a:' + slug;
+// ── Action cards: text + a clear pixel symbol (no art), so the effect reads
+//    at a glance. Family picks the accent colour + icon. ──
+const FAM = {
+  lineMove:       { c: '#e8c35a', s: 'arrow' },
+  toFrontEnd:     { c: '#e8c35a', s: 'tofront' },
+  rearrange:      { c: '#7fd0c0', s: 'swap' },
+  lineAddRemove:  { c: '#d4537e', s: 'x' },
+  persistent:     { c: '#9e86c0', s: 'pin' },
+  playerAttack:   { c: '#ec8b7a', s: 'steal' },
+  selfEconomy:    { c: '#85b0e0', s: 'draw' },
+  dayTurnControl: { c: '#f3dd8a', s: 'day' },
+};
+function symFor(def) {
+  const f = def.family, p = def.params || {};
+  if (f === 'rearrange') return p.kind === 'reverse' ? 'swap' : 'shuffle';
+  if (f === 'lineAddRemove') return (p.kind === 'addNobles' || p.kind === 'lateArrival') ? 'plus' : 'x';
+  if (f === 'persistent') return p.kind === 'support' ? 'dots' : (p.kind === 'toughCrowd' ? 'star' : 'shield');
+  if (f === 'selfEconomy') return p.kind === 'points' ? 'star' : 'draw';
+  return (FAM[f] || {}).s || 'diamond';
+}
+function wrapText(cc, text, font, maxW, maxLines) {
+  cc.font = font;
+  const words = String(text || '').split(/\s+/).filter(Boolean), lines = [];
+  let cur = '';
+  for (const w of words) { const t = cur ? cur + ' ' + w : w; if (cc.measureText(t).width <= maxW || !cur) cur = t; else { lines.push(cur); cur = w; } }
+  if (cur) lines.push(cur);
+  if (lines.length <= maxLines) return lines;
+  const kept = lines.slice(0, maxLines);
+  let last = kept[maxLines - 1];
+  while (last.length > 1 && cc.measureText(last + '…').width > maxW) last = last.slice(0, -1);
+  kept[maxLines - 1] = last.replace(/\s*\S*$/, '').trimEnd() + '…';
+  return kept;
+}
+function drawSym(cc, key, cx, cy, s, col) {
+  cc.save(); cc.fillStyle = col; cc.strokeStyle = col; cc.lineWidth = Math.max(4, s * 0.26); cc.lineCap = 'square';
+  const tri = (ax, ay, bx, by, dx, dy) => { cc.beginPath(); cc.moveTo(ax, ay); cc.lineTo(bx, by); cc.lineTo(dx, dy); cc.closePath(); cc.fill(); };
+  const rarrow = (ox, oy, len, hd) => { cc.fillRect(ox - len / 2, oy - hd * 0.18, len * 0.64, hd * 0.36); tri(ox + len * 0.5, oy, ox + len * 0.1, oy - hd * 0.55, ox + len * 0.1, oy + hd * 0.55); };
+  switch (key) {
+    case 'arrow': rarrow(cx, cy, s * 1.8, s * 1.1); break;
+    case 'tofront': rarrow(cx + s * 0.18, cy, s * 1.5, s * 1.0); cc.fillRect(cx - s * 0.95, cy - s * 0.6, Math.max(4, s * 0.24), s * 1.2); break;
+    case 'swap':
+      cc.fillRect(cx - s * 0.7, cy - s * 0.52, s * 1.0, Math.max(3, s * 0.2)); tri(cx + s * 0.62, cy - s * 0.42, cx + s * 0.2, cy - s * 0.72, cx + s * 0.2, cy - s * 0.12);
+      cc.fillRect(cx - s * 0.3, cy + s * 0.32, s * 1.0, Math.max(3, s * 0.2)); tri(cx - s * 0.62, cy + s * 0.42, cx - s * 0.2, cy + s * 0.12, cx - s * 0.2, cy + s * 0.72); break;
+    case 'shuffle':
+      cc.lineWidth = Math.max(4, s * 0.22);
+      cc.beginPath(); cc.moveTo(cx - s * 0.7, cy - s * 0.6); cc.lineTo(cx + s * 0.7, cy + s * 0.6); cc.moveTo(cx - s * 0.7, cy + s * 0.6); cc.lineTo(cx + s * 0.7, cy - s * 0.6); cc.stroke();
+      tri(cx + s * 0.78, cy + s * 0.66, cx + s * 0.3, cy + s * 0.66, cx + s * 0.78, cy + s * 0.18);
+      tri(cx + s * 0.78, cy - s * 0.66, cx + s * 0.78, cy - s * 0.18, cx + s * 0.3, cy - s * 0.66); break;
+    case 'x':
+      cc.lineWidth = Math.max(6, s * 0.34); cc.beginPath();
+      cc.moveTo(cx - s * 0.6, cy - s * 0.6); cc.lineTo(cx + s * 0.6, cy + s * 0.6); cc.moveTo(cx + s * 0.6, cy - s * 0.6); cc.lineTo(cx - s * 0.6, cy + s * 0.6); cc.stroke(); break;
+    case 'plus':
+      cc.fillRect(cx - s * 0.18, cy - s * 0.65, s * 0.36, s * 1.3); cc.fillRect(cx - s * 0.65, cy - s * 0.18, s * 1.3, s * 0.36); break;
+    case 'star': {
+      cc.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? s * 0.34 : s * 0.75; const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r; i ? cc.lineTo(x, y) : cc.moveTo(x, y); } cc.closePath(); cc.fill(); break;
+    }
+    case 'dots': { const cols = ['#c0392b', '#4a90c2', '#6aa84f']; for (let i = 0; i < 3; i++) { cc.fillStyle = cols[i]; cc.fillRect(cx - s * 0.75 + i * s * 0.6, cy - s * 0.25, s * 0.42, s * 0.5); } break; }
+    case 'shield':
+      cc.beginPath(); cc.moveTo(cx, cy - s * 0.7); cc.lineTo(cx + s * 0.6, cy - s * 0.4); cc.lineTo(cx + s * 0.55, cy + s * 0.35); cc.lineTo(cx, cy + s * 0.75); cc.lineTo(cx - s * 0.55, cy + s * 0.35); cc.lineTo(cx - s * 0.6, cy - s * 0.4); cc.closePath(); cc.fill(); break;
+    case 'steal': rarrow(cx - s * 0.1, cy, s * 1.5, s * 1.0); cc.fillRect(cx - s * 0.95, cy - s * 0.45, s * 0.3, s * 0.9); break;
+    case 'draw':
+      cc.fillRect(cx - s * 0.5, cy - s * 0.7, s * 1.0, s * 1.3);
+      cc.fillStyle = '#1a1622'; cc.fillRect(cx - s * 0.34, cy - s * 0.5, s * 0.68, s * 0.95);
+      cc.fillStyle = col; cc.fillRect(cx - s * 0.1, cy - s * 0.28, s * 0.2, s * 0.6); cc.fillRect(cx - s * 0.28, cy - s * 0.1, s * 0.56, s * 0.2); break;
+    case 'day': {
+      cc.beginPath(); cc.arc(cx, cy, s * 0.42, 0, 7); cc.fill();
+      for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; cc.fillRect(cx + Math.cos(a) * s * 0.6 - 2, cy + Math.sin(a) * s * 0.6 - 2, 5, 5); } break;
+    }
+    default: cc.beginPath(); cc.moveTo(cx, cy - s * 0.7); cc.lineTo(cx + s * 0.7, cy); cc.lineTo(cx, cy + s * 0.7); cc.lineTo(cx - s * 0.7, cy); cc.closePath(); cc.fill();
+  }
+  cc.restore();
+}
+export function renderActionPix(def) {
+  if (!def || typeof def === 'string') return null;   // needs the full card def now
+  const slug = spriteSlug(def.name), k = 'a:' + slug;
   if (cache[k] !== undefined) return cache[k];
-  const spr = ACTION_SPRITES[slug];
-  return (cache[k] = spr ? render(spr, true, '#46566e') : null);
+  const accent = (FAM[def.family] || {}).c || '#c8a24a';
+  const c = document.createElement('canvas'); c.width = CW; c.height = CH;
+  const cc = c.getContext('2d'); cc.imageSmoothingEnabled = false;
+  cc.fillStyle = '#1a1622'; cc.fillRect(0, 0, CW, CH);
+  cc.fillStyle = 'rgba(0,0,0,.16)'; for (let y = 0; y < CH; y += 4) cc.fillRect(0, y, CW, 2);
+  cc.strokeStyle = '#000'; cc.lineWidth = 8; cc.strokeRect(4, 4, CW - 8, CH - 8);
+  cc.strokeStyle = accent; cc.lineWidth = 3; cc.strokeRect(8, 8, CW - 16, CH - 16);
+  cc.textAlign = 'center'; cc.textBaseline = 'top';
+  // name (gold, up to 2 lines)
+  const nm = wrapText(cc, def.name.toUpperCase(), "9px 'Silkscreen', monospace", CW - 22, 2);
+  cc.font = "9px 'Silkscreen', monospace";
+  nm.forEach((ln, i) => { const y = 16 + i * 14; cc.fillStyle = '#000'; cc.fillText(ln, CW / 2 + 1, y + 1); cc.fillStyle = accent; cc.fillText(ln, CW / 2, y); });
+  const nb = 16 + nm.length * 14 + 4;
+  cc.fillStyle = accent; cc.fillRect(16, nb, CW - 32, 2);
+  // symbol
+  drawSym(cc, symFor(def), CW / 2, nb + 34, 24, accent);
+  // effect text (cream, wrapped)
+  const ty = nb + 66;
+  const tx = wrapText(cc, def.text, "7px 'Silkscreen', monospace", CW - 22, 10);
+  cc.font = "7px 'Silkscreen', monospace";
+  tx.forEach((ln, i) => { const y = ty + i * 10; cc.fillStyle = '#000'; cc.fillText(ln, CW / 2 + 1, y + 1); cc.fillStyle = '#d8cdb8'; cc.fillText(ln, CW / 2, y); });
+  return (cache[k] = c.toDataURL('image/png'));
+}
+// Regenerate the text cards once the pixel fonts have actually loaded.
+if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => { for (const key in cache) if (key[0] === 'a' && key[1] === ':') delete cache[key]; });
 }
 
 // Pixel card BACK (deck piles): a plaza/cool panel with a chunky guillotine-blade motif.

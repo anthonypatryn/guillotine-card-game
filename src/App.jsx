@@ -143,6 +143,10 @@ export default function App() {
     return () => clearTimeout(t);
   }, [G.phase, G.current, G.day, G.actionPlayed, speed, dayHold]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Re-render once the pixel fonts load so the text action-cards regenerate crisp.
+  const [, fontTick] = useReducer((x) => x + 1, 0);
+  useEffect(() => { if (document.fonts?.ready) document.fonts.ready.then(() => fontTick()).catch(() => {}); }, []);
+
   // Hold the game-over screen until the final severed head has landed (bounced
   // on the ground + flown to the pile), then a short cinematic beat.
   const [gameOverReady, setGameOverReady] = useState(false);
