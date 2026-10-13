@@ -24,6 +24,18 @@ function ShineLogo({ className }) {
   return <img src="/logo-guillotine.svg" alt="Guillotine" className={'pixlogo-img ' + (className || '')} />;
 }
 
+// Breadcrumb trail so every page can get back to the game / tools.
+function Breadcrumb({ page }) {
+  return (
+    <nav className="breadcrumb" aria-label="Breadcrumb">
+      <a href="/">◂ Guillotine</a>
+      <span className="bc-sep">▸</span>
+      <span className="bc-cur">{page}</span>
+      <a className="bc-tools" href="/tools.html">Pixel Tools →</a>
+    </nav>
+  );
+}
+
 export default function App() {
   const game = useGame();
   const { G } = game;
@@ -1754,6 +1766,7 @@ function CardEdit() {
   );
   return (
     <div className="card-edit">
+      <Breadcrumb page="Card Editor" />
       <h1>Number placement</h1>
       <p className="muted"><b>Drag</b> each number to move · <b>scroll</b> over it to scale. Then tell me &ldquo;done&rdquo; and I&rsquo;ll bake these in exactly. (Baskets all share one position.)</p>
       <div className="ce-grid">
@@ -1777,8 +1790,9 @@ function StatsView() {
   useEffect(() => { fetch('/api/tally').then((r) => r.json()).then(setData).catch(() => setData({ games: 0, wins: [], recent: [] })); }, []);
   return (
     <div className="art-review stats-view">
+      <Breadcrumb page="Hall of Fame" />
       <header className="ar-head">
-        <img className="ar-logo" src="/logo-title.png" alt="Guillotine" />
+        <img className="ar-logo pixlogo-img" src="/logo-guillotine.svg" alt="Guillotine" />
         <h1>Hall of Fame</h1>
         <p className="muted">{data ? `${data.games} game${data.games === 1 ? '' : 's'} played` : 'Loading…'}</p>
       </header>
@@ -1826,8 +1840,9 @@ function ArtReview() {
   const COLORSET = ['red', 'blue', 'green', 'gray', 'purple'];
   return (
     <div className="art-review">
+      <Breadcrumb page="Art Review" />
       <header className="ar-head">
-        <img className="ar-logo" src="/logo-title.png" alt="Guillotine" />
+        <img className="ar-logo pixlogo-img" src="/logo-guillotine.svg" alt="Guillotine" />
         <h1>Art Review</h1>
         <p className="muted">Each asset is shown on dark &amp; light. Tell me which fleur (A–D) to approve, and flag anything to fix.</p>
       </header>

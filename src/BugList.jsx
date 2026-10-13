@@ -99,6 +99,12 @@ export default function BugList() {
   );
   return (
     <div className="buglist">
+      <nav className="breadcrumb" aria-label="Breadcrumb">
+        <a href="/">◂ Guillotine</a>
+        <span className="bc-sep">▸</span>
+        <span className="bc-cur">Bug Reports</span>
+        <a className="bc-tools" href="/tools.html">Pixel Tools →</a>
+      </nav>
       <header className="bug-head">
         <span className="bug-head-title">Bug reports · {open.length} open</span>
         <div className="bug-head-r"><button className="btn" onClick={() => load()}>Refresh</button><a className="btn" href="/">Game</a></div>

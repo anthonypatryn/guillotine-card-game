@@ -23,6 +23,11 @@
     image-rendering:pixelated;}
   .veil{position:fixed;inset:0;background:rgba(12,9,18,.72);z-index:-1}
   .wrap{max-width:860px;margin:0 auto;padding-block:30px;padding-left:16px;padding-right:16px}
+  .crumb{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;margin:0 0 18px;
+    background:#16111f;border:3px solid #000;box-shadow:0 3px 0 #000;font-family:var(--font-px);font-size:9px}
+  .crumb a{color:var(--gold);text-decoration:none;text-shadow:1px 1px 0 #000}
+  .crumb a:hover{text-decoration:underline}
+  .crumb .cs{color:var(--dim)} .crumb .cc{color:var(--ink);text-shadow:1px 1px 0 #000}
   .logo{display:block;width:min(80vw,360px);margin:0 auto 6px;image-rendering:pixelated;filter:drop-shadow(0 4px 0 rgba(0,0,0,.55))}
   h1{font-family:var(--font-px);font-size:14px;text-align:center;letter-spacing:1px;margin:10px 0 2px;color:var(--gold);text-shadow:2px 2px 0 #000}
   .sub{text-align:center;color:var(--dim);font-size:15px;margin:0 0 6px}
@@ -49,6 +54,9 @@
 <body>
 <div class="veil"></div>
 <div class="wrap">
+  <nav class="crumb" aria-label="Breadcrumb">
+    <a href="/">◂ Guillotine</a><span class="cs">▸</span><span class="cc">Pixel Tools</span>
+  </nav>
   <img class="logo" src="/logo-guillotine.svg" alt="Guillotine">
   <h1>Pixel Tools</h1>
   <p class="sub">Every editor + preview for the pixel art.</p>
