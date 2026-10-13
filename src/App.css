@@ -813,12 +813,12 @@ button { -webkit-appearance: none; appearance: none; }
   position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; pointer-events: none;
   background: #181320; color: #ffe08a; image-rendering: pixelated;
   clip-path: inset(0 100% 0 0);
-  animation: dayWipe8 2.6s steps(22, end) forwards;
+  animation: dayWipe8 3.6s steps(26, end) forwards;
 }
 @keyframes dayWipe8 {
   0%   { clip-path: inset(0 100% 0 0); }
-  20%  { clip-path: inset(0 0 0 0); }
-  80%  { clip-path: inset(0 0 0 0); }
+  24%  { clip-path: inset(0 0 0 0); }
+  82%  { clip-path: inset(0 0 0 0); }
   100% { clip-path: inset(0 0 0 100%); }
 }
 .dc-scan { position: absolute; inset: 0; pointer-events: none;
@@ -1101,7 +1101,7 @@ button { -webkit-appearance: none; appearance: none; }
 .guillo-blade { animation-duration: 1.25s; }
 .modal { animation: popIn2 .46s cubic-bezier(.2, .8, .25, 1); }
 .hovercard.center { animation-duration: .34s; }
-.day-clock { animation-duration: 2.8s; }
+.day-clock { animation-duration: 3.6s; }
 .callout { animation-duration: 3.4s; }
 .turn-cue { animation-duration: 2.1s; }
 

@@ -8,6 +8,7 @@ import {
 import { computeScore } from './utils/scoring';
 import { SCENE_SPRITES, SPRITE_ALPHA, NOBLE_SPRITES, spriteSlug } from './data/sprites';
 import PlazaScene from './PlazaScene';
+import { isHeadBusy } from './animBus';
 import { judgeBlocks, callousActive, getStep, canPlayCard, playBlockReason, applyResolved } from './utils/effects';
 import { HostRoom, JoinClient, cleanCode } from './net/room';
 import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner, DealFlier, setReduce } from './Effects';
@@ -106,6 +107,22 @@ export default function App() {
     return () => clearTimeout(t);
   }, [G.phase, G.current, G.day, G.actionPlayed, speed]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Hold the game-over screen until the final severed head has landed (bounced
+  // on the ground + flown to the pile), then a short cinematic beat.
+  const [gameOverReady, setGameOverReady] = useState(false);
+  useEffect(() => {
+    if (G.phase !== 'gameOver') { setGameOverReady(false); return; }
+    let cancelled = false, t; const start = Date.now();
+    const tick = () => {
+      if (cancelled) return;
+      const waited = Date.now() - start;
+      if ((waited < 500 || isHeadBusy()) && waited < 7000) { t = setTimeout(tick, 120); return; }
+      t = setTimeout(() => { if (!cancelled) setGameOverReady(true); }, 800);
+    };
+    tick();
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [G.phase]);
+
 
   const view = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('view') : null;
   if (view === 'bugs') return <div className="app"><BugList /></div>;
@@ -138,9 +155,9 @@ export default function App() {
       ) : (
         <>
           {G.phase === 'start' && <StartScreen onStart={game.start} onOnline={() => setOnline({ kind: 'home' })} onResume={hasLocalSave ? loadLocalSave : null} />}
-          {G.phase === 'gameOver' && <GameOver G={G} onRestart={game.restart} />}
+          {G.phase === 'gameOver' && gameOverReady && <GameOver G={G} onRestart={game.restart} />}
           {needPass && <PassScreen name={G.players[G.current].name} onReady={game.advanceFromPass} />}
-          {(G.phase === 'playing' || G.phase === 'targeting' || (G.phase === 'pass' && !needPass)) && <Board game={game} />}
+          {(G.phase === 'playing' || G.phase === 'targeting' || (G.phase === 'pass' && !needPass) || (G.phase === 'gameOver' && !gameOverReady)) && <Board game={game} />}
         </>
       )}
       <button className="bug-fab" title="Report a bug" onClick={() => setShowBug(true)}><BugIcon className="bug-ico" /></button>
@@ -559,6 +576,20 @@ function Board({ game }) {
   const prevLine = useRef(0);
   const prevHandLen = useRef(0);
 
+  // Hold the day-transition banner until the final head of the day has landed.
+  const [displayDay, setDisplayDay] = useState(G.day);
+  useEffect(() => {
+    if (G.day === displayDay) return;
+    let cancelled = false, t; const start = Date.now();
+    const tick = () => {
+      if (cancelled) return;
+      if (isHeadBusy() && Date.now() - start < 7000) { t = setTimeout(tick, 120); return; }
+      setDisplayDay(G.day);
+    };
+    t = setTimeout(tick, 400);   // let the final head bounce/land first
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [G.day, displayDay]);
+
   // Diff new log entries → slice + blood for beheadings, callout for plays.
   useLayoutEffect(() => {
     const fresh = G.log.filter(l => l.id > seen.current);
@@ -789,7 +820,7 @@ function Board({ game }) {
       {callout && <Callout callout={callout} />}
       {turnCue && <div className="turn-cue">Your turn</div>}
       <Coach show={myTurn && G.day === 1} />
-      <DayBanner day={G.day} />
+      <DayBanner day={displayDay} />
     </div>
   );
 }

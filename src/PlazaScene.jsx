@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react';
 import { NOBLE_SPRITES, SCENE_SPRITES, SPRITE_ALPHA as A, spriteSlug } from './data/sprites';
 import { NOBLE_BY_ID, COLOR_HEX } from './data/cards';
 import { playBladeFall, playClang, playHeadBounce, playBloodDrops, isMuted } from './sound';
+import { setHeadBusy } from './animBus';
 
 // ── scene geometry (internal canvas resolution) ──
 const W = 1000, Hc = 360, S = 4, baseY = Hc - 14, NECK = 12, SG = 7;
@@ -59,7 +60,7 @@ export default function PlazaScene({ game, onNobleHover, onNobleClick, canBehead
     }
     let raf; const loop = (t) => { draw(t); raf = requestAnimationFrame(loop); };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    return () => { cancelAnimationFrame(raf); setHeadBusy(false); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -147,6 +148,8 @@ export default function PlazaScene({ game, onNobleHover, onNobleClick, canBehead
     drawExecutioner(ctx, geom, s, t, s.execHover && canBeheadRef.current, ready, labelRef.current || 'Off with their head!');
     updateHead(ctx, s); updateBlood(ctx, s); updateFloaters(ctx, s);
     ctx.restore();
+    // tell the app a behead is still in flight so it holds the day / game-over
+    setHeadBusy(!!(s.exec || s.head || s.queue.length));
   }
 
   function sever(s) {
