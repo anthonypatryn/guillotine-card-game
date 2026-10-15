@@ -805,6 +805,7 @@ function Board({ game }) {
               {game.canUndo() && <button className="btn small" onClick={game.undo} title="Undo (U)">↶ Undo</button>}
             </div>
           )}
+          {canBehead && <button className="touch-behead" onClick={game.collectAndEnd}>{beheadCta}</button>}
           {canBehead && <p className="behead-hint">Click the executioner to behead{G.line.length === 0 ? ' / end turn' : ''} <span className="bh-key">Space</span></p>}
         </div>
 
