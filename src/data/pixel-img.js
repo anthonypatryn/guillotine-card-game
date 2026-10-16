@@ -129,31 +129,48 @@ function drawSym(cc, key, cx, cy, s, col) {
   }
   cc.restore();
 }
+// Card style config — the Action Card Editor produces exactly this shape, and
+// "pull the card style" bakes it here. Defaults reproduce the original look.
+// Per family: c = accent colour, s = symbol override (null → auto by card params).
+export const CARD_STYLE = {
+  bg: '#1a1622', text: '#d8cdb8', scan: 0.16, border: 3,
+  nameSize: 9, symSize: 24, textSize: 7, textLines: 10, divider: true,
+  fam: {
+    lineMove:       { c: '#e8c35a', s: null },
+    toFrontEnd:     { c: '#e8c35a', s: null },
+    rearrange:      { c: '#7fd0c0', s: null },
+    lineAddRemove:  { c: '#d4537e', s: null },
+    persistent:     { c: '#9e86c0', s: null },
+    playerAttack:   { c: '#ec8b7a', s: null },
+    selfEconomy:    { c: '#85b0e0', s: null },
+    dayTurnControl: { c: '#f3dd8a', s: null },
+  },
+};
 export function renderActionPix(def) {
   if (!def || typeof def === 'string') return null;   // needs the full card def now
   const slug = spriteSlug(def.name), k = 'a:' + slug;
   if (cache[k] !== undefined) return cache[k];
-  const accent = (FAM[def.family] || {}).c || '#c8a24a';
+  const cs = CARD_STYLE, fam = cs.fam[def.family] || {};
+  const accent = fam.c || '#c8a24a', sym = fam.s || symFor(def);
   const c = document.createElement('canvas'); c.width = CW; c.height = CH;
   const cc = c.getContext('2d'); cc.imageSmoothingEnabled = false;
-  cc.fillStyle = '#1a1622'; cc.fillRect(0, 0, CW, CH);
-  cc.fillStyle = 'rgba(0,0,0,.16)'; for (let y = 0; y < CH; y += 4) cc.fillRect(0, y, CW, 2);
+  cc.fillStyle = cs.bg; cc.fillRect(0, 0, CW, CH);
+  if (cs.scan > 0) { cc.fillStyle = `rgba(0,0,0,${cs.scan})`; for (let y = 0; y < CH; y += 4) cc.fillRect(0, y, CW, 2); }
   cc.strokeStyle = '#000'; cc.lineWidth = 8; cc.strokeRect(4, 4, CW - 8, CH - 8);
-  cc.strokeStyle = accent; cc.lineWidth = 3; cc.strokeRect(8, 8, CW - 16, CH - 16);
+  if (cs.border > 0) { cc.strokeStyle = accent; cc.lineWidth = cs.border; cc.strokeRect(8, 8, CW - 16, CH - 16); }
   cc.textAlign = 'center'; cc.textBaseline = 'top';
-  // name (gold, up to 2 lines)
-  const nm = wrapText(cc, def.name.toUpperCase(), "9px 'Silkscreen', monospace", CW - 22, 2);
-  cc.font = "9px 'Silkscreen', monospace";
-  nm.forEach((ln, i) => { const y = 16 + i * 14; cc.fillStyle = '#000'; cc.fillText(ln, CW / 2 + 1, y + 1); cc.fillStyle = accent; cc.fillText(ln, CW / 2, y); });
-  const nb = 16 + nm.length * 14 + 4;
-  cc.fillStyle = accent; cc.fillRect(16, nb, CW - 32, 2);
-  // symbol
-  drawSym(cc, symFor(def), CW / 2, nb + 34, 24, accent);
-  // effect text (cream, wrapped)
-  const ty = nb + 66;
-  const tx = wrapText(cc, def.text, "7px 'Silkscreen', monospace", CW - 22, 10);
-  cc.font = "7px 'Silkscreen', monospace";
-  tx.forEach((ln, i) => { const y = ty + i * 10; cc.fillStyle = '#000'; cc.fillText(ln, CW / 2 + 1, y + 1); cc.fillStyle = '#d8cdb8'; cc.fillText(ln, CW / 2, y); });
+  const nameLineH = cs.nameSize + 5;
+  const nm = wrapText(cc, def.name.toUpperCase(), `${cs.nameSize}px 'Silkscreen', monospace`, CW - 22, 2);
+  cc.font = `${cs.nameSize}px 'Silkscreen', monospace`;
+  nm.forEach((ln, i) => { const y = 16 + i * nameLineH; cc.fillStyle = '#000'; cc.fillText(ln, CW / 2 + 1, y + 1); cc.fillStyle = accent; cc.fillText(ln, CW / 2, y); });
+  const nb = 16 + nm.length * nameLineH + 4;
+  if (cs.divider) { cc.fillStyle = accent; cc.fillRect(16, nb, CW - 32, 2); }
+  const symCY = nb + 22 + cs.symSize / 2;
+  drawSym(cc, sym, CW / 2, symCY, cs.symSize, accent);
+  const ty = symCY + cs.symSize / 2 + 20, textLineH = cs.textSize + 3;
+  const tx = wrapText(cc, def.text, `${cs.textSize}px 'Silkscreen', monospace`, CW - 22, cs.textLines);
+  cc.font = `${cs.textSize}px 'Silkscreen', monospace`;
+  tx.forEach((ln, i) => { const y = ty + i * textLineH; cc.fillStyle = '#000'; cc.fillText(ln, CW / 2 + 1, y + 1); cc.fillStyle = cs.text; cc.fillText(ln, CW / 2, y); });
   return (cache[k] = c.toDataURL('image/png'));
 }
 // Regenerate the text cards once the pixel fonts have actually loaded.
