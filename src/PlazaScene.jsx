@@ -1,8 +1,8 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { NOBLE_SPRITES, SCENE_SPRITES, SPRITE_ALPHA as A, spriteSlug } from './data/sprites';
 import { NOBLE_BY_ID, COLOR_HEX } from './data/cards';
 import { playBladeFall, playClang, playHeadBounce, playBloodDrops, isMuted } from './sound';
-import { setHeadBusy } from './animBus';
+import { setHeadBusy, onDayGate } from './animBus';
 
 // ── scene geometry (internal canvas resolution) ──
 const W = 1000, Hc = 360, S = 4, baseY = Hc - 14, NECK = 12, SG = 7;
@@ -44,6 +44,8 @@ export default function PlazaScene({ game, onNobleHover, onNobleClick, canBehead
   const beheadCb = useRef(onBehead); beheadCb.current = onBehead;
   const canBeheadRef = useRef(canBehead); canBeheadRef.current = canBehead;
   const labelRef = useRef(ctaLabel); labelRef.current = ctaLabel;
+  const [gate, setGate] = useState(0);
+  useEffect(() => onDayGate(setGate), []);
 
   // one-time init + rAF loop
   useEffect(() => {
@@ -78,13 +80,18 @@ export default function PlazaScene({ game, onNobleHover, onNobleClick, canBehead
       }
     }
     s.seen = maxId;
-    // rebuild vis from the current line, preserving positions for cards that remain
-    s.vis = line.map((inst) => {
+    // Day transition: gate 1 = empty street (hide the freshly-dealt line while the
+    // last head flies + the twirl covers); gate 2 = banner is covering, so place the
+    // new nobles INSTANTLY (no walk-in) so the wipe reveals them already standing.
+    if (gate === 1) { s.vis = []; return; }
+    const snap = gate === 2, g = s.geom, gp = snap ? gapFor(line.length) : 0;
+    s.vis = line.map((inst, i) => {
       const def = NOBLE_BY_ID[inst.defId], ex = prev[inst.uid];
       if (ex) { ex.def = def; return ex; }
-      return { uid: inst.uid, def, spr: sprFor(def), _x: W + 60, _wt: 0 };
+      const x0 = snap && g ? g.frontX - i * gp : W + 60;
+      return { uid: inst.uid, def, spr: sprFor(def), _x: x0, _wt: 0 };
     });
-  }, [game.G.line, game.G.log]);
+  }, [game.G.line, game.G.log, gate]);
 
   function gapFor(n) { const geom = sc.current.geom; const avail = (geom?.frontX ?? W - 140) - 30; return Math.max(24, Math.min(92, avail / Math.max(1, n))); }
 

@@ -8,7 +8,7 @@ import {
 import { computeScore } from './utils/scoring';
 import { SCENE_SPRITES, SPRITE_ALPHA, NOBLE_SPRITES, spriteSlug } from './data/sprites';
 import PlazaScene from './PlazaScene';
-import { isHeadBusy } from './animBus';
+import { isHeadBusy, setDayGate } from './animBus';
 import { judgeBlocks, callousActive, getStep, canPlayCard, playBlockReason, applyResolved } from './utils/effects';
 import { HostRoom, JoinClient, cleanCode } from './net/room';
 import { SliceFlier, BloodSplatter, SlicedThumb, ScoreDelta, DayBanner, DealFlier, setReduce } from './Effects';
@@ -112,8 +112,9 @@ export default function App() {
     const was = prevDayHold.current; prevDayHold.current = G.day;
     if (G.day <= was) return;                   // restart / not a forward day advance
     setDayHold(true);
+    setDayGate(1);                              // empty street until the banner covers
     let done = false, t; const start = Date.now();
-    const clear = () => { if (!done) { done = true; setDayHold(false); } };
+    const clear = () => { if (!done) { done = true; setDayHold(false); setDayGate(0); } };
     const afterHead = () => {
       if (done) return;
       if (isHeadBusy() && Date.now() - start < 6000) { t = setTimeout(afterHead, 120); return; }

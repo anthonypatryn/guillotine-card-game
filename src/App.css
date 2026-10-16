@@ -809,17 +809,22 @@ button { -webkit-appearance: none; appearance: none; }
 @property --dca { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 @property --dcb { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 /* 8-bit day transition: flat colour, chunky stepped wipe, pixel type */
+@property --dca { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@property --dcb { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 .day-clock {
   position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; pointer-events: none;
   background: #181320; color: #ffe08a; image-rendering: pixelated;
-  clip-path: inset(0 100% 0 0);
-  animation: dayWipe8 3.6s steps(26, end) forwards;
+  --dca: 0deg; --dcb: 0deg;
+  -webkit-mask: conic-gradient(from -90deg, transparent var(--dcb), #000 var(--dcb), #000 var(--dca), transparent var(--dca));
+          mask: conic-gradient(from -90deg, transparent var(--dcb), #000 var(--dcb), #000 var(--dca), transparent var(--dca));
+  animation: dayTwirl 3.6s linear forwards;
 }
-@keyframes dayWipe8 {
-  0%   { clip-path: inset(0 100% 0 0); }
-  24%  { clip-path: inset(0 0 0 0); }
-  82%  { clip-path: inset(0 0 0 0); }
-  100% { clip-path: inset(0 0 0 100%); }
+/* clockwise twirl: cover sweeping clockwise, hold, then reveal sweeping clockwise */
+@keyframes dayTwirl {
+  0%   { --dca: 0deg;   --dcb: 0deg; }
+  22%  { --dca: 360deg; --dcb: 0deg; }
+  80%  { --dca: 360deg; --dcb: 0deg; }
+  100% { --dca: 360deg; --dcb: 360deg; }
 }
 .dc-scan { position: absolute; inset: 0; pointer-events: none;
   background:

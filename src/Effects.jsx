@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
 import { NOBLE_BY_ID, COLOR_HEX, nobleImg } from './data/cards';
 import { playRooster, playDaySting } from './sound';
+import { dayGate, setDayGate } from './animBus';
 
 let _reduce = typeof matchMedia !== 'undefined'
   && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -213,7 +214,17 @@ export function DealFlier({ deal, onDone }) {
 // A clock wipe to a solid panel showing the day (rooster crows at dawn), then
 // the clock wipes back to reveal the board.
 export function DayBanner({ day }) {
-  useEffect(() => { if (!_reduce) { playRooster(); playDaySting(); } }, [day]);
+  useEffect(() => {
+    if (!_reduce) { playRooster(); playDaySting(); }
+    // When this is a real day transition (gate armed to 1 by the app), the new
+    // nobles are placed while the screen is FULLY COVERED (gate 2), then the
+    // twirl wipes away to reveal them standing (gate 0).
+    if (dayGate() === 1) {
+      const t1 = setTimeout(() => setDayGate(2), _reduce ? 60 : 820);    // fully covered → place people
+      const t2 = setTimeout(() => setDayGate(0), _reduce ? 120 : 3600);  // wiped away → resume
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
+  }, [day]);
   return (
     <div className="day-clock" key={day} data-day={day} aria-hidden="true">
       <div className="dc-fleurs" />
