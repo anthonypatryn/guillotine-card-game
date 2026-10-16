@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useReducer } from 'react'
 import './App.css';
 import { useGame } from './hooks/useGame';
 import {
-  NOBLE_BY_ID, ACTION_BY_ID, COLOR_HEX, COLORS,
+  NOBLE_BY_ID, ACTION_BY_ID, ACTIONS, COLOR_HEX, COLORS,
   nobleImg, actionImg, NOBLE_BACK, ACTION_BACK,
 } from './data/cards';
 import { computeScore } from './utils/scoring';
@@ -169,6 +169,7 @@ export default function App() {
   if (view === 'bugs') return <div className="app"><BugList /></div>;
   if (view === 'art') return <div className="app"><ArtReview /></div>;
   if (view === 'cardedit') return <div className="app"><CardEdit /></div>;
+  if (view === 'cards') return <div className="app"><ActionCardsReview /></div>;
   if (view === 'stats') return <div className="app"><StatsView /></div>;
 
   return (
@@ -318,6 +319,7 @@ function StartScreen({ onStart, onOnline, onResume }) {
       <p className="muted small resist-note">CPU players are code-named Résistants — set each one's nerve from Recrue to Maquisard. Or play online with friends.</p>
       <div className="start-links">
         <a className="hof-link" href="?view=stats">Hall of Fame →</a>
+        <a className="hof-link" href="?view=cards">Action Cards →</a>
         <a className="hof-link" href="?view=bugs">Bug reports (PIN) →</a>
         <a className="hof-link" href="/tools.html">Pixel Tools →</a>
       </div>
@@ -1866,6 +1868,50 @@ function ArtTile({ src, label, node, size = 96, wide }) {
     </figure>
   );
 }
+// ─── Action-card review (/?view=cards) — every action card grouped by type ───
+const ACTION_GROUPS = [
+  { fam: 'lineMove',       name: 'Movement',       desc: 'Move a noble forward or back in line.' },
+  { fam: 'toFrontEnd',     name: 'To Front / End', desc: 'Jump a noble to the guillotine or the back of the line.' },
+  { fam: 'rearrange',      name: 'Rearrange',      desc: 'Reverse or shuffle a stretch of the line.' },
+  { fam: 'lineAddRemove',  name: 'Add / Remove',   desc: 'Add nobles to the line or pull them out.' },
+  { fam: 'persistent',     name: 'Persistent',     desc: 'Played in front of you — a lasting effect or ongoing scoring.' },
+  { fam: 'playerAttack',   name: 'Attack',         desc: "Target another player's line, hand, or pile." },
+  { fam: 'selfEconomy',    name: 'Economy',        desc: 'Draw, discard, swap hands, or take points.' },
+  { fam: 'dayTurnControl', name: 'Day / Turn',     desc: 'Bend the day or the turn order.' },
+];
+function ActionCardsReview() {
+  return (
+    <div className="cards-review">
+      <Breadcrumb page="Action Cards" />
+      <header className="ar-head">
+        <img className="ar-logo pixlogo-img" src="/logo-guillotine.svg" alt="Guillotine" />
+        <h1>Action Cards</h1>
+        <p className="muted">All {ACTIONS.length} action cards, grouped by type — a reference for designing a pattern per group.</p>
+      </header>
+      {ACTION_GROUPS.map(g => {
+        const cards = ACTIONS.filter(a => a.family === g.fam);
+        if (!cards.length) return null;
+        return (
+          <section key={g.fam} className="cr-group">
+            <div className="cr-group-head">
+              <h2>{g.name} <span className="cr-count">{cards.length}</span></h2>
+              <p className="cr-desc">{g.desc}</p>
+            </div>
+            <div className="cr-grid">
+              {cards.map(a => (
+                <figure key={a.id} className="cr-card">
+                  <img src={actionImg(a.id)} alt={a.name} loading="lazy" />
+                  <figcaption>{a.name}</figcaption>
+                </figure>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 function ArtReview() {
   const COLORSET = ['red', 'blue', 'green', 'gray', 'purple'];
   return (
