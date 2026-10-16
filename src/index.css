@@ -1,5 +1,6 @@
-/* Pixel fonts only — Press Start 2P (display) + Silkscreen (body/labels). */
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap');
+/* Pixel fonts — Press Start 2P (display), Silkscreen (short labels),
+   Pixelify Sans (body/long copy — far more legible at small sizes). */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&family=Pixelify+Sans:wght@400;500;600;700&display=swap');
 
 * { box-sizing: border-box; }
 
@@ -24,10 +25,10 @@
   --purple: #8e5fb0;
 
   --font-display: 'Press Start 2P', monospace;
-  --font-head: 'Silkscreen', monospace;
-  --font-body: 'Silkscreen', monospace;
+  --font-head: 'Silkscreen', monospace;      /* short labels/accents */
+  --font-body: 'Pixelify Sans', monospace;   /* body + small copy — legible pixel */
   --font-pixel: 'Press Start 2P', monospace;
-  --font-flavor: 'Silkscreen', monospace;   /* prose/long text — kept pixel */
+  --font-flavor: 'Pixelify Sans', monospace; /* prose/long text — legible pixel */
 }
 
 html, body, #root { margin: 0; height: 100%; }

@@ -196,8 +196,10 @@ export function renderActionPix(def) {
   }
   const ty = symCY + cs.symSize / 2 + 20, textLineH = cs.textSize + 3;
   const fitLines = Math.max(1, Math.floor((CH - 10 - ty) / textLineH));   // never run off the card
-  const tx = wrapText(cc, def.text, `${cs.textSize}px 'Silkscreen', monospace`, CW - 22, Math.min(cs.textLines, fitLines));
-  cc.font = `${cs.textSize}px 'Silkscreen', monospace`;
+  // body copy in Pixelify Sans — far more legible at this size than Silkscreen
+  const bodyFont = `${cs.textSize}px 'Pixelify Sans', monospace`;
+  const tx = wrapText(cc, def.text, bodyFont, CW - 22, Math.min(cs.textLines, fitLines));
+  cc.font = bodyFont;
   tx.forEach((ln, i) => { const y = ty + i * textLineH; cc.fillStyle = '#000'; cc.fillText(ln, CW / 2 + 1, y + 1); cc.fillStyle = cs.text; cc.fillText(ln, CW / 2, y); });
   return (cache[k] = c.toDataURL('image/png'));
 }
