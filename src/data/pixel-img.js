@@ -132,18 +132,27 @@ function drawSym(cc, key, cx, cy, s, col) {
 // Card style config — the Action Card Editor produces exactly this shape, and
 // "pull the card style" bakes it here. Defaults reproduce the original look.
 // Per family: c = accent colour, s = symbol override (null → auto by card params).
+// ≤ (up to) and = (exact) glyphs drawn as solid pixels; use the current fillStyle.
+function drawEq(cc, cx, cy, s) { cc.fillRect(cx - s, cy - s * 0.95, s * 2, s * 0.6); cc.fillRect(cx - s, cy + s * 0.35, s * 2, s * 0.6); }
+function drawLeq(cc, cx, cy, s) {
+  const t = Math.max(3, s * 0.55);
+  cc.save(); cc.strokeStyle = cc.fillStyle; cc.lineWidth = t; cc.lineCap = 'square'; cc.lineJoin = 'miter';
+  cc.beginPath(); cc.moveTo(cx + s, cy - s); cc.lineTo(cx - s, cy - s * 0.1); cc.lineTo(cx + s, cy + s * 0.8); cc.stroke();
+  cc.restore();
+  cc.fillRect(cx - s, cy + s * 1.15, s * 2, s * 0.55);
+}
 export const CARD_STYLE = {
-  bg: '#1a1622', text: '#d8cdb8', scan: 0.16, border: 3,
-  nameSize: 9, symSize: 24, textSize: 7, textLines: 10, divider: true,
+  bg: '#1a1622', text: '#d8cdb8', scan: 0.2, border: 4,
+  nameSize: 13, symSize: 36, textSize: 11, textLines: 10, divider: true,
   fam: {
-    lineMove:       { c: '#e8c35a', s: null },
-    toFrontEnd:     { c: '#e8c35a', s: null },
-    rearrange:      { c: '#7fd0c0', s: null },
-    lineAddRemove:  { c: '#d4537e', s: null },
-    persistent:     { c: '#9e86c0', s: null },
-    playerAttack:   { c: '#ec8b7a', s: null },
-    selfEconomy:    { c: '#85b0e0', s: null },
-    dayTurnControl: { c: '#f3dd8a', s: null },
+    lineMove:       { c: '#fbbb09', s: null },
+    toFrontEnd:     { c: '#fbbb09', s: null },
+    rearrange:      { c: '#05ffcd', s: null },
+    lineAddRemove:  { c: '#ff00ae', s: null },
+    persistent:     { c: '#7d23fb', s: null },
+    playerAttack:   { c: '#ff2600', s: null },
+    selfEconomy:    { c: '#0077ff', s: null },
+    dayTurnControl: { c: '#ffffff', s: null },
   },
 };
 export function renderActionPix(def) {
@@ -166,9 +175,28 @@ export function renderActionPix(def) {
   const nb = 16 + nm.length * nameLineH + 4;
   if (cs.divider) { cc.fillStyle = accent; cc.fillRect(16, nb, CW - 32, 2); }
   const symCY = nb + 22 + cs.symSize / 2;
-  drawSym(cc, sym, CW / 2, symCY, cs.symSize, accent);
+  const num = (def.params && typeof def.params.n === 'number') ? def.params.n : null;
+  if (num !== null) {
+    // symbol on the left, a BIG number on the right, with an up-to (≤) / exact (=) mark
+    drawSym(cc, sym, CW * 0.37, symCY, cs.symSize * 0.9, accent);
+    const nx = CW * 0.7, nz = Math.round(cs.symSize * 1.25);
+    cc.save(); cc.textAlign = 'center'; cc.textBaseline = 'middle'; cc.font = `${nz}px 'Press Start 2P', monospace`;
+    cc.fillStyle = '#000'; cc.fillText(String(num), nx + 2, symCY + 2);
+    cc.fillStyle = accent; cc.fillText(String(num), nx, symCY);
+    if (typeof def.params.exact === 'boolean') {
+      const iy = symCY - nz * 0.72, g = Math.max(4, cs.symSize * 0.18);
+      cc.fillStyle = '#000';
+      if (def.params.exact) drawEq(cc, nx + 2, iy + 2, g); else drawLeq(cc, nx + 2, iy + 2, g);
+      cc.fillStyle = accent;
+      if (def.params.exact) drawEq(cc, nx, iy, g); else drawLeq(cc, nx, iy, g);
+    }
+    cc.restore(); cc.textAlign = 'center'; cc.textBaseline = 'top';
+  } else {
+    drawSym(cc, sym, CW / 2, symCY, cs.symSize, accent);
+  }
   const ty = symCY + cs.symSize / 2 + 20, textLineH = cs.textSize + 3;
-  const tx = wrapText(cc, def.text, `${cs.textSize}px 'Silkscreen', monospace`, CW - 22, cs.textLines);
+  const fitLines = Math.max(1, Math.floor((CH - 10 - ty) / textLineH));   // never run off the card
+  const tx = wrapText(cc, def.text, `${cs.textSize}px 'Silkscreen', monospace`, CW - 22, Math.min(cs.textLines, fitLines));
   cc.font = `${cs.textSize}px 'Silkscreen', monospace`;
   tx.forEach((ln, i) => { const y = ty + i * textLineH; cc.fillStyle = '#000'; cc.fillText(ln, CW / 2 + 1, y + 1); cc.fillStyle = cs.text; cc.fillText(ln, CW / 2, y); });
   return (cache[k] = c.toDataURL('image/png'));
